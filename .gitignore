@@ -1,0 +1,11 @@
+/build/
+/godot_demo/bin/*.dylib
+/godot_demo/bin/*.so
+/godot_demo/bin/*.dll
+/godot_demo/bin/mujoco.framework/
+/godot_demo/.godot/
+/example/bin/*.dylib
+/example/bin/*.so
+/example/bin/*.dll
+/example/bin/mujoco.framework/
+/example/.godot/

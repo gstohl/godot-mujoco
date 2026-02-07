@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://dd4py44q8m8y2"]
+
+[ext_resource type="Script" path="res://scripts/PhysicsBenchmark.cs" id="1_8q7h2"]
+
+[node name="PhysicsBenchmark" type="Node3D"]
+script = ExtResource("1_8q7h2")

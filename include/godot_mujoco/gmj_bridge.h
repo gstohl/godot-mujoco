@@ -36,6 +36,14 @@ int gmj_nv(const gmj_model* model);
 int gmj_nu(const gmj_model* model);
 int gmj_nbody(const gmj_model* model);
 
+int gmj_body_id(const gmj_model* model, const char* body_name);
+int gmj_joint_id(const gmj_model* model, const char* joint_name);
+int gmj_actuator_id(const gmj_model* model, const char* actuator_name);
+
+const char* gmj_body_name(const gmj_model* model, int body_id);
+const char* gmj_joint_name(const gmj_model* model, int joint_id);
+const char* gmj_actuator_name(const gmj_model* model, int actuator_id);
+
 gmj_error_code gmj_set_ctrl(const gmj_model* model, gmj_data* data,
                             int actuator_index, double value);
 gmj_error_code gmj_get_ctrl(const gmj_model* model, const gmj_data* data,
@@ -50,6 +58,27 @@ gmj_error_code gmj_get_qvel(const gmj_model* model, const gmj_data* data,
                             int qvel_index, double* out_value);
 gmj_error_code gmj_set_qvel(const gmj_model* model, gmj_data* data,
                             int qvel_index, double value);
+
+gmj_error_code gmj_get_qpos_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values);
+gmj_error_code gmj_set_qpos_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values);
+
+gmj_error_code gmj_get_qvel_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values);
+gmj_error_code gmj_set_qvel_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values);
+
+gmj_error_code gmj_get_ctrl_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values);
+gmj_error_code gmj_set_ctrl_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values);
 
 gmj_error_code gmj_body_world_position(const gmj_model* model,
                                        const gmj_data* data, int body_index,

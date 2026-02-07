@@ -1,0 +1,5 @@
+{
+  "weights": [[1.0]],
+  "bias": [0.0],
+  "clip_action": 1.0
+}

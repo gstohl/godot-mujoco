@@ -58,6 +58,19 @@ static gmj_error_code gmj_validate_ptrs(const gmj_model* model,
   return GMJ_OK;
 }
 
+static gmj_error_code gmj_validate_slice(int start_index, int count,
+                                         int length) {
+  if (count < 0 || start_index < 0) {
+    gmj_set_error("slice start/count must be non-negative");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+  if (start_index > length || count > (length - start_index)) {
+    gmj_set_error("slice out of range");
+    return GMJ_ERR_INDEX_OUT_OF_RANGE;
+  }
+  return GMJ_OK;
+}
+
 const char* gmj_mujoco_version(void) {
   static _Thread_local char version[32];
   const int ver = mj_version();
@@ -227,6 +240,102 @@ int gmj_nbody(const gmj_model* model) {
   return model->handle->nbody;
 }
 
+int gmj_body_id(const gmj_model* model, const char* body_name) {
+  int id = -1;
+  if (model == NULL || model->handle == NULL || body_name == NULL) {
+    gmj_set_error("invalid model pointer or body_name");
+    return -1;
+  }
+
+  id = mj_name2id(model->handle, mjOBJ_BODY, body_name);
+  if (id < 0) {
+    gmj_set_error("body_name not found");
+    return -1;
+  }
+  gmj_set_error(NULL);
+  return id;
+}
+
+int gmj_joint_id(const gmj_model* model, const char* joint_name) {
+  int id = -1;
+  if (model == NULL || model->handle == NULL || joint_name == NULL) {
+    gmj_set_error("invalid model pointer or joint_name");
+    return -1;
+  }
+
+  id = mj_name2id(model->handle, mjOBJ_JOINT, joint_name);
+  if (id < 0) {
+    gmj_set_error("joint_name not found");
+    return -1;
+  }
+  gmj_set_error(NULL);
+  return id;
+}
+
+int gmj_actuator_id(const gmj_model* model, const char* actuator_name) {
+  int id = -1;
+  if (model == NULL || model->handle == NULL || actuator_name == NULL) {
+    gmj_set_error("invalid model pointer or actuator_name");
+    return -1;
+  }
+
+  id = mj_name2id(model->handle, mjOBJ_ACTUATOR, actuator_name);
+  if (id < 0) {
+    gmj_set_error("actuator_name not found");
+    return -1;
+  }
+  gmj_set_error(NULL);
+  return id;
+}
+
+const char* gmj_body_name(const gmj_model* model, int body_id) {
+  const char* name = NULL;
+  if (model == NULL || model->handle == NULL) {
+    gmj_set_error("invalid model pointer");
+    return NULL;
+  }
+  if (body_id < 0 || body_id >= model->handle->nbody) {
+    gmj_set_error("body_id out of range");
+    return NULL;
+  }
+
+  name = mj_id2name(model->handle, mjOBJ_BODY, body_id);
+  gmj_set_error(NULL);
+  return name;
+}
+
+const char* gmj_joint_name(const gmj_model* model, int joint_id) {
+  const char* name = NULL;
+  if (model == NULL || model->handle == NULL) {
+    gmj_set_error("invalid model pointer");
+    return NULL;
+  }
+  if (joint_id < 0 || joint_id >= model->handle->njnt) {
+    gmj_set_error("joint_id out of range");
+    return NULL;
+  }
+
+  name = mj_id2name(model->handle, mjOBJ_JOINT, joint_id);
+  gmj_set_error(NULL);
+  return name;
+}
+
+const char* gmj_actuator_name(const gmj_model* model, int actuator_id) {
+  const char* name = NULL;
+  if (model == NULL || model->handle == NULL) {
+    gmj_set_error("invalid model pointer");
+    return NULL;
+  }
+  if (actuator_id < 0 || actuator_id >= model->handle->nu) {
+    gmj_set_error("actuator_id out of range");
+    return NULL;
+  }
+
+  name = mj_id2name(model->handle, mjOBJ_ACTUATOR, actuator_id);
+  gmj_set_error(NULL);
+  return name;
+}
+
 gmj_error_code gmj_set_ctrl(const gmj_model* model, gmj_data* data,
                             int actuator_index, double value) {
   const gmj_error_code valid = gmj_validate_ptrs(model, data);
@@ -338,6 +447,165 @@ gmj_error_code gmj_set_qvel(const gmj_model* model, gmj_data* data,
   return GMJ_OK;
 }
 
+gmj_error_code gmj_get_qpos_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values) {
+  int i = 0;
+  gmj_error_code valid = GMJ_OK;
+  if (out_values == NULL) {
+    gmj_set_error("out_values is null");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+  if (model == NULL || model->handle == NULL || data == NULL ||
+      data->handle == NULL) {
+    gmj_set_error("invalid model or data pointer");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+
+  valid = gmj_validate_slice(start_index, count, model->handle->nq);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+
+  for (i = 0; i < count; ++i) {
+    out_values[i] = (double)data->handle->qpos[start_index + i];
+  }
+  gmj_set_error(NULL);
+  return GMJ_OK;
+}
+
+gmj_error_code gmj_set_qpos_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values) {
+  int i = 0;
+  gmj_error_code valid = GMJ_OK;
+  valid = gmj_validate_ptrs(model, data);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+  if (values == NULL) {
+    gmj_set_error("values is null");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+
+  valid = gmj_validate_slice(start_index, count, model->handle->nq);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+
+  for (i = 0; i < count; ++i) {
+    data->handle->qpos[start_index + i] = (mjtNum)values[i];
+  }
+  gmj_set_error(NULL);
+  return GMJ_OK;
+}
+
+gmj_error_code gmj_get_qvel_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values) {
+  int i = 0;
+  gmj_error_code valid = GMJ_OK;
+  if (out_values == NULL) {
+    gmj_set_error("out_values is null");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+  if (model == NULL || model->handle == NULL || data == NULL ||
+      data->handle == NULL) {
+    gmj_set_error("invalid model or data pointer");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+
+  valid = gmj_validate_slice(start_index, count, model->handle->nv);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+
+  for (i = 0; i < count; ++i) {
+    out_values[i] = (double)data->handle->qvel[start_index + i];
+  }
+  gmj_set_error(NULL);
+  return GMJ_OK;
+}
+
+gmj_error_code gmj_set_qvel_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values) {
+  int i = 0;
+  gmj_error_code valid = GMJ_OK;
+  valid = gmj_validate_ptrs(model, data);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+  if (values == NULL) {
+    gmj_set_error("values is null");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+
+  valid = gmj_validate_slice(start_index, count, model->handle->nv);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+
+  for (i = 0; i < count; ++i) {
+    data->handle->qvel[start_index + i] = (mjtNum)values[i];
+  }
+  gmj_set_error(NULL);
+  return GMJ_OK;
+}
+
+gmj_error_code gmj_get_ctrl_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values) {
+  int i = 0;
+  gmj_error_code valid = GMJ_OK;
+  if (out_values == NULL) {
+    gmj_set_error("out_values is null");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+  if (model == NULL || model->handle == NULL || data == NULL ||
+      data->handle == NULL) {
+    gmj_set_error("invalid model or data pointer");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+
+  valid = gmj_validate_slice(start_index, count, model->handle->nu);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+
+  for (i = 0; i < count; ++i) {
+    out_values[i] = (double)data->handle->ctrl[start_index + i];
+  }
+  gmj_set_error(NULL);
+  return GMJ_OK;
+}
+
+gmj_error_code gmj_set_ctrl_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values) {
+  int i = 0;
+  gmj_error_code valid = GMJ_OK;
+  valid = gmj_validate_ptrs(model, data);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+  if (values == NULL) {
+    gmj_set_error("values is null");
+    return GMJ_ERR_INVALID_ARGUMENT;
+  }
+
+  valid = gmj_validate_slice(start_index, count, model->handle->nu);
+  if (valid != GMJ_OK) {
+    return valid;
+  }
+
+  for (i = 0; i < count; ++i) {
+    data->handle->ctrl[start_index + i] = (mjtNum)values[i];
+  }
+  gmj_set_error(NULL);
+  return GMJ_OK;
+}
+
 gmj_error_code gmj_body_world_position(const gmj_model* model,
                                        const gmj_data* data, int body_index,
                                        double* out_xyz_3) {
@@ -436,6 +704,48 @@ int gmj_nbody(const gmj_model* model) {
   return -1;
 }
 
+int gmj_body_id(const gmj_model* model, const char* body_name) {
+  (void)model;
+  (void)body_name;
+  gmj_unavailable();
+  return -1;
+}
+
+int gmj_joint_id(const gmj_model* model, const char* joint_name) {
+  (void)model;
+  (void)joint_name;
+  gmj_unavailable();
+  return -1;
+}
+
+int gmj_actuator_id(const gmj_model* model, const char* actuator_name) {
+  (void)model;
+  (void)actuator_name;
+  gmj_unavailable();
+  return -1;
+}
+
+const char* gmj_body_name(const gmj_model* model, int body_id) {
+  (void)model;
+  (void)body_id;
+  gmj_unavailable();
+  return NULL;
+}
+
+const char* gmj_joint_name(const gmj_model* model, int joint_id) {
+  (void)model;
+  (void)joint_id;
+  gmj_unavailable();
+  return NULL;
+}
+
+const char* gmj_actuator_name(const gmj_model* model, int actuator_id) {
+  (void)model;
+  (void)actuator_id;
+  gmj_unavailable();
+  return NULL;
+}
+
 gmj_error_code gmj_set_ctrl(const gmj_model* model, gmj_data* data,
                             int actuator_index, double value) {
   (void)model;
@@ -487,6 +797,72 @@ gmj_error_code gmj_set_qvel(const gmj_model* model, gmj_data* data,
   (void)data;
   (void)qvel_index;
   (void)value;
+  return gmj_unavailable();
+}
+
+gmj_error_code gmj_get_qpos_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values) {
+  (void)model;
+  (void)data;
+  (void)start_index;
+  (void)count;
+  (void)out_values;
+  return gmj_unavailable();
+}
+
+gmj_error_code gmj_set_qpos_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values) {
+  (void)model;
+  (void)data;
+  (void)start_index;
+  (void)count;
+  (void)values;
+  return gmj_unavailable();
+}
+
+gmj_error_code gmj_get_qvel_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values) {
+  (void)model;
+  (void)data;
+  (void)start_index;
+  (void)count;
+  (void)out_values;
+  return gmj_unavailable();
+}
+
+gmj_error_code gmj_set_qvel_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values) {
+  (void)model;
+  (void)data;
+  (void)start_index;
+  (void)count;
+  (void)values;
+  return gmj_unavailable();
+}
+
+gmj_error_code gmj_get_ctrl_slice(const gmj_model* model, const gmj_data* data,
+                                  int start_index, int count,
+                                  double* out_values) {
+  (void)model;
+  (void)data;
+  (void)start_index;
+  (void)count;
+  (void)out_values;
+  return gmj_unavailable();
+}
+
+gmj_error_code gmj_set_ctrl_slice(const gmj_model* model, gmj_data* data,
+                                  int start_index, int count,
+                                  const double* values) {
+  (void)model;
+  (void)data;
+  (void)start_index;
+  (void)count;
+  (void)values;
   return gmj_unavailable();
 }
 

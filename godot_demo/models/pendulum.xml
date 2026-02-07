@@ -1,0 +1,12 @@
+<mujoco model="pendulum">
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="pendulum" pos="0 0 1">
+      <joint name="hinge" type="hinge" axis="0 1 0"/>
+      <geom type="capsule" fromto="0 0 0 0 0 -0.6" size="0.04" density="600"/>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="hinge_motor" joint="hinge" gear="50"/>
+  </actuator>
+</mujoco>

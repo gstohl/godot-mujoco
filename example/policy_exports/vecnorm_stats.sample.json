@@ -1,0 +1,6 @@
+{
+  "obs_mean": [0.0],
+  "obs_var": [1.0],
+  "clip_obs": 10.0,
+  "epsilon": 1e-8
+}
