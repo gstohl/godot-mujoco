@@ -30,10 +30,6 @@ public partial class PhysicsBenchmark : Node3D
             results.Add(new BenchmarkResult(objectCount, BenchmarkDurationSec, godotUncapped, mujocoUncapped));
         }
 
-        BenchmarkResult estimate100k = EstimateAt100k(results);
-        results.Add(estimate100k);
-        GD.Print("--- Added 100000-sphere estimate (power-law extrapolation from 1000 & 10000) ---");
-
         GD.Print("--- Results ---");
         foreach (BenchmarkResult result in results)
         {
@@ -42,8 +38,7 @@ public partial class PhysicsBenchmark : Node3D
             GD.Print(result.ObjectCount + " spheres | Godot=" + godotText +
                      " | MuJoCo=" + result.MujocoStepsPerSecond.ToString("F2") +
                      " | ratio=" + ratioText +
-                     " | duration=" + result.DurationSec.ToString("F1") + "s" +
-                     (result.IsEstimated ? " | estimated" : ""));
+                     " | duration=" + result.DurationSec.ToString("F1") + "s");
         }
 
         GetTree().Quit();
@@ -183,43 +178,20 @@ public partial class PhysicsBenchmark : Node3D
         return sb.ToString();
     }
 
-    private static BenchmarkResult EstimateAt100k(List<BenchmarkResult> measured)
-    {
-        BenchmarkResult m1 = measured[1];
-        BenchmarkResult m2 = measured[2];
-        double godot = ExtrapolatePowerLaw(m1.ObjectCount, m1.GodotStepsPerSecond, m2.ObjectCount, m2.GodotStepsPerSecond, 100000);
-        double mujoco = ExtrapolatePowerLaw(m1.ObjectCount, m1.MujocoStepsPerSecond, m2.ObjectCount, m2.MujocoStepsPerSecond, 100000);
-        return new BenchmarkResult(100000, BenchmarkDurationSec, godot, mujoco, true);
-    }
-
-    private static double ExtrapolatePowerLaw(int x1, double y1, int x2, double y2, int xTarget)
-    {
-        if (x1 <= 0 || x2 <= 0 || xTarget <= 0 || y1 <= 0.0 || y2 <= 0.0)
-        {
-            return 0.0;
-        }
-
-        double b = Math.Log(y2 / y1) / Math.Log((double)x2 / x1);
-        double a = y1 / Math.Pow(x1, b);
-        return a * Math.Pow(xTarget, b);
-    }
-
     private readonly struct BenchmarkResult
     {
-        public BenchmarkResult(int objectCount, double durationSec, double godotStepsPerSecond, double mujocoStepsPerSecond, bool isEstimated = false)
+        public BenchmarkResult(int objectCount, double durationSec, double godotStepsPerSecond, double mujocoStepsPerSecond)
         {
             ObjectCount = objectCount;
             DurationSec = durationSec;
             GodotStepsPerSecond = godotStepsPerSecond;
             MujocoStepsPerSecond = mujocoStepsPerSecond;
-            IsEstimated = isEstimated;
         }
 
         public int ObjectCount { get; }
         public double DurationSec { get; }
         public double GodotStepsPerSecond { get; }
         public double MujocoStepsPerSecond { get; }
-        public bool IsEstimated { get; }
         public double Ratio => GodotStepsPerSecond > 0.0 ? MujocoStepsPerSecond / GodotStepsPerSecond : 0.0;
     }
 }

@@ -130,9 +130,8 @@ Benchmark scene: `example/PhysicsBenchmark.tscn`
 
 What it does:
 
-- Runs sphere-count scenarios: `100`, `1000`, `10000` (measured) and `100000` (estimated).
-- For measured scenarios, runs uncapped Godot physics and uncapped MuJoCo stepping.
-- Adds a 100k estimate using power-law extrapolation from 1k and 10k data points.
+- Runs sphere-count scenarios: `100`, `1000`, `10000`.
+- For each scenario, runs uncapped Godot physics and uncapped MuJoCo stepping.
 - Uses `dt = 1/60` and reports steps/sec per engine.
 
 Run headless:
@@ -149,7 +148,6 @@ Scene coverage:
 
 - Godot scene workloads: `100`, `1000`, `10000` `RigidBody3D` spheres + static floor in `example/scripts/PhysicsBenchmark.cs`.
 - MuJoCo scene workloads: generated free-body sphere models for `100`, `1000`, `10000` + plane floor (`user://mujoco_benchmark_*.xml`) from the same benchmark script.
-- 100k point in chart/report is estimated (not directly simulated in this run).
 
 Axes in chart:
 
@@ -165,10 +163,9 @@ Test config:
 
 Measured result (latest run):
 
-- `100 spheres` -> Godot: `1160.68`, MuJoCo: `7554.93`, ratio: `6.51x`
-- `1000 spheres` -> Godot: `557.60`, MuJoCo: `676.89`, ratio: `1.21x`
-- `10000 spheres` -> Godot: `34.64`, MuJoCo: `5.62`, ratio: `0.16x`
-- `100000 spheres` (estimated) -> Godot: `2.15`, MuJoCo: `0.05`, ratio: `0.02x`
+- `100 spheres` -> Godot: `1160.72`, MuJoCo: `7608.90`, ratio: `6.56x`
+- `1000 spheres` -> Godot: `571.64`, MuJoCo: `699.31`, ratio: `1.22x`
+- `10000 spheres` -> Godot: `36.12`, MuJoCo: `6.98`, ratio: `0.19x`
 
 Interpretation:
 
