@@ -130,9 +130,10 @@ Benchmark scene: `example/PhysicsBenchmark.tscn`
 
 What it does:
 
-- Spawns 1000 dynamic spheres in Godot physics and measures physics-frame throughput.
-- Generates a MuJoCo XML with 1000 free bodies and runs the same number of fixed steps.
-- Uses `dt = 1/60` and prints uncapped throughput.
+- Runs sphere-count scenarios: `100`, `1000`, `10000` (measured) and `100000` (estimated).
+- For measured scenarios, runs uncapped Godot physics and uncapped MuJoCo stepping.
+- Adds a 100k estimate using power-law extrapolation from 1k and 10k data points.
+- Uses `dt = 1/60` and reports steps/sec per engine.
 
 Run headless:
 
@@ -146,21 +147,28 @@ Run headless:
 
 Scene coverage:
 
-- Godot scene workload: 1000 `RigidBody3D` spheres + static floor in `example/scripts/PhysicsBenchmark.cs`.
-- MuJoCo scene workload: generated 1000 free-body spheres + plane floor (`user://mujoco_benchmark_1000.xml`) from the same benchmark script.
+- Godot scene workloads: `100`, `1000`, `10000` `RigidBody3D` spheres + static floor in `example/scripts/PhysicsBenchmark.cs`.
+- MuJoCo scene workloads: generated free-body sphere models for `100`, `1000`, `10000` + plane floor (`user://mujoco_benchmark_*.xml`) from the same benchmark script.
+- 100k point in chart/report is estimated (not directly simulated in this run).
+
+Axes in chart:
+
+- X-axis: steps per second
+- Y-axis: sphere-count/engine pairs
 
 Test config:
 
-- Objects: `1000`
+- Objects: `100`, `1000`, `10000`
 - Fixed timestep: `1/60`
-- Steps: `600`
+- Duration: `8s` per measured scenario
 - Runner: headless Godot .NET (`4.6.stable.mono`)
 
 Measured result (latest run):
 
-- Godot physics (uncapped mode): `397.98 steps/sec`
-- MuJoCo (uncapped mode): `434.22 steps/sec`
-- Ratio (uncapped): `1.09x` (MuJoCo/Godot)
+- `100 spheres` -> Godot: `1160.68`, MuJoCo: `7554.93`, ratio: `6.51x`
+- `1000 spheres` -> Godot: `557.60`, MuJoCo: `676.89`, ratio: `1.21x`
+- `10000 spheres` -> Godot: `34.64`, MuJoCo: `5.62`, ratio: `0.16x`
+- `100000 spheres` (estimated) -> Godot: `2.15`, MuJoCo: `0.05`, ratio: `0.02x`
 
 Interpretation:
 

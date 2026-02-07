@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -7,30 +8,48 @@ using Godot;
 
 public partial class PhysicsBenchmark : Node3D
 {
-    private const int ObjectCount = 1000;
-    private const int BenchmarkSteps = 600;
+    private const int UncappedPhysicsTicksPerSecond = 20000;
     private const double TimeStep = 1.0 / 60.0;
+    private const double BenchmarkDurationSec = 8.0;
+    private static readonly int[] ObjectCounts = { 100, 1000, 10000 };
+    private static readonly List<Shape3D> ShapeKeepAlive = new List<Shape3D>();
 
     public override async void _Ready()
     {
-        GD.Print("=== Physics Benchmark (1000 objects) ===");
-        GD.Print("Steps: " + BenchmarkSteps + " at dt=" + TimeStep);
+        GD.Print("=== Physics Benchmark (Uncapped) ===");
+        GD.Print("dt=" + TimeStep + ", PhysicsTicksPerSecond=" + UncappedPhysicsTicksPerSecond +
+                 ", duration=" + BenchmarkDurationSec + "s");
 
-        double godotUncapped = await RunGodotPhysicsBenchmark(20000);
-        double mujocoUncapped = RunMujocoBenchmark();
+        var results = new List<BenchmarkResult>();
+        foreach (int objectCount in ObjectCounts)
+        {
+            GD.Print("--- Running " + objectCount + " spheres ---");
+
+            double godotUncapped = await RunGodotPhysicsBenchmark(objectCount, BenchmarkDurationSec, UncappedPhysicsTicksPerSecond);
+            double mujocoUncapped = RunMujocoBenchmark(objectCount, BenchmarkDurationSec);
+            results.Add(new BenchmarkResult(objectCount, BenchmarkDurationSec, godotUncapped, mujocoUncapped));
+        }
+
+        BenchmarkResult estimate100k = EstimateAt100k(results);
+        results.Add(estimate100k);
+        GD.Print("--- Added 100000-sphere estimate (power-law extrapolation from 1000 & 10000) ---");
 
         GD.Print("--- Results ---");
-        GD.Print("Godot physics steps/sec (uncapped mode): " + godotUncapped.ToString("F2"));
-        GD.Print("MuJoCo steps/sec (uncapped mode): " + mujocoUncapped.ToString("F2"));
-        if (godotUncapped > 0.0)
+        foreach (BenchmarkResult result in results)
         {
-            GD.Print("MuJoCo/Godot ratio (uncapped): " + (mujocoUncapped / godotUncapped).ToString("F2") + "x");
+            string godotText = result.GodotStepsPerSecond > 0.0 ? result.GodotStepsPerSecond.ToString("F2") : "N/A";
+            string ratioText = result.GodotStepsPerSecond > 0.0 ? result.Ratio.ToString("F2") + "x" : "N/A";
+            GD.Print(result.ObjectCount + " spheres | Godot=" + godotText +
+                     " | MuJoCo=" + result.MujocoStepsPerSecond.ToString("F2") +
+                     " | ratio=" + ratioText +
+                     " | duration=" + result.DurationSec.ToString("F1") + "s" +
+                     (result.IsEstimated ? " | estimated" : ""));
         }
 
         GetTree().Quit();
     }
 
-    private async Task<double> RunGodotPhysicsBenchmark(int physicsTicksPerSecond)
+    private async Task<double> RunGodotPhysicsBenchmark(int objectCount, double durationSec, int physicsTicksPerSecond)
     {
         Engine.PhysicsTicksPerSecond = physicsTicksPerSecond;
 
@@ -39,20 +58,29 @@ public partial class PhysicsBenchmark : Node3D
 
         var floorBody = new StaticBody3D();
         var floorShapeNode = new CollisionShape3D();
-        floorShapeNode.Shape = new BoxShape3D { Size = new Vector3(60.0f, 1.0f, 60.0f) };
-        floorShapeNode.Position = new Vector3(0.0f, -0.5f, 0.0f);
+        var floorShape = new BoxShape3D { Size = new Vector3(80.0f, 1.0f, 80.0f) };
+        ShapeKeepAlive.Add(floorShape);
+        floorShapeNode.Shape = floorShape;
+        floorShapeNode.Position = new Vector3(0.0f, 0.0f, -0.5f);
         floorBody.AddChild(floorShapeNode);
         root.AddChild(floorBody);
 
         var sphereShape = new SphereShape3D { Radius = 0.1f };
-        int side = (int)Math.Ceiling(Math.Sqrt(ObjectCount));
-        for (int i = 0; i < ObjectCount; i++)
+        ShapeKeepAlive.Add(sphereShape);
+
+        int side = (int)Math.Ceiling(Math.Pow(objectCount, 1.0 / 3.0));
+        for (int i = 0; i < objectCount; i++)
         {
             int x = i % side;
-            int y = i / side;
+            int y = (i / side) % side;
+            int z = i / (side * side);
 
             var rb = new RigidBody3D();
-            rb.Position = new Vector3((x - side / 2) * 0.24f, 1.5f + (y * 0.015f), 0.0f);
+            rb.Position = new Vector3(
+                (x - side / 2) * 0.30f,
+                (y - side / 2) * 0.30f,
+                1.2f + (z * 0.24f)
+            );
 
             var cs = new CollisionShape3D();
             cs.Shape = sphereShape;
@@ -63,21 +91,22 @@ public partial class PhysicsBenchmark : Node3D
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
         await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
+        int executedSteps = 0;
         var sw = Stopwatch.StartNew();
-        for (int i = 0; i < BenchmarkSteps; i++)
+        while (sw.Elapsed.TotalSeconds < durationSec)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+            executedSteps++;
         }
         sw.Stop();
 
-        root.QueueFree();
-
-        return BenchmarkSteps / sw.Elapsed.TotalSeconds;
+        root.Free();
+        return executedSteps / sw.Elapsed.TotalSeconds;
     }
 
-    private double RunMujocoBenchmark()
+    private double RunMujocoBenchmark(int objectCount, double durationSec)
     {
-        string xmlPath = WriteMujocoBenchmarkXml();
+        string xmlPath = WriteMujocoBenchmarkXml(objectCount);
         byte[] errorBuffer = MujocoNative.CreateErrorBuffer();
 
         IntPtr model = MujocoNative.gmj_model_load_xml(xmlPath, errorBuffer, (UIntPtr)errorBuffer.Length);
@@ -95,57 +124,102 @@ public partial class PhysicsBenchmark : Node3D
             return 0.0;
         }
 
+        int executedSteps = 0;
         var sw = Stopwatch.StartNew();
-        for (int i = 0; i < BenchmarkSteps; i++)
+        while (sw.Elapsed.TotalSeconds < durationSec)
         {
             int rc = MujocoNative.gmj_step(model, data, 1);
             if (rc != 0)
             {
-                GD.PushWarning("MuJoCo step error at step " + i + ": " + rc + " / " + MujocoNative.LastError());
+                GD.PushWarning("MuJoCo step error at step " + executedSteps + ": " + rc + " / " + MujocoNative.LastError());
                 break;
             }
+            executedSteps++;
         }
         sw.Stop();
 
         MujocoNative.gmj_data_free(data);
         MujocoNative.gmj_model_free(model);
-
-        return BenchmarkSteps / sw.Elapsed.TotalSeconds;
+        return executedSteps / sw.Elapsed.TotalSeconds;
     }
 
-    private static string WriteMujocoBenchmarkXml()
+    private static string WriteMujocoBenchmarkXml(int objectCount)
     {
-        string xml = BuildMujocoXml();
-        string path = ProjectSettings.GlobalizePath("user://mujoco_benchmark_1000.xml");
-        File.WriteAllText(path, xml);
+        string path = ProjectSettings.GlobalizePath("user://mujoco_benchmark_" + objectCount + ".xml");
+        if (!File.Exists(path))
+        {
+            string xml = BuildMujocoXml(objectCount);
+            File.WriteAllText(path, xml);
+        }
         return path;
     }
 
-    private static string BuildMujocoXml()
+    private static string BuildMujocoXml(int objectCount)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("<mujoco model=\"benchmark_1000\">");
+        sb.AppendLine("<mujoco model=\"benchmark_" + objectCount + "\">");
         sb.AppendLine("  <option timestep=\"0.0166666667\" gravity=\"0 0 -9.81\"/>");
         sb.AppendLine("  <worldbody>");
-        sb.AppendLine("    <geom name=\"floor\" type=\"plane\" size=\"50 50 0.1\"/>");
+        sb.AppendLine("    <geom type=\"plane\" size=\"80 80 0.1\"/>");
 
-        int side = (int)Math.Ceiling(Math.Sqrt(ObjectCount));
-        for (int i = 0; i < ObjectCount; i++)
+        int side = (int)Math.Ceiling(Math.Pow(objectCount, 1.0 / 3.0));
+        for (int i = 0; i < objectCount; i++)
         {
             int x = i % side;
-            int y = i / side;
-            double px = (x - side / 2) * 0.24;
-            double py = 0.0;
-            double pz = 1.5 + (y * 0.015);
+            int y = (i / side) % side;
+            int z = i / (side * side);
+            double px = (x - side / 2) * 0.30;
+            double py = (y - side / 2) * 0.30;
+            double pz = 1.2 + (z * 0.24);
 
-            sb.AppendLine($"    <body name=\"b{i}\" pos=\"{px:F5} {py:F5} {pz:F5}\">");
+            sb.AppendLine($"    <body pos=\"{px:F3} {py:F3} {pz:F3}\">");
             sb.AppendLine("      <freejoint/>");
-            sb.AppendLine("      <geom type=\"sphere\" size=\"0.1\" density=\"500\"/>");
+            sb.AppendLine("      <geom type=\"sphere\" size=\"0.1\"/>");
             sb.AppendLine("    </body>");
         }
 
         sb.AppendLine("  </worldbody>");
         sb.AppendLine("</mujoco>");
         return sb.ToString();
+    }
+
+    private static BenchmarkResult EstimateAt100k(List<BenchmarkResult> measured)
+    {
+        BenchmarkResult m1 = measured[1];
+        BenchmarkResult m2 = measured[2];
+        double godot = ExtrapolatePowerLaw(m1.ObjectCount, m1.GodotStepsPerSecond, m2.ObjectCount, m2.GodotStepsPerSecond, 100000);
+        double mujoco = ExtrapolatePowerLaw(m1.ObjectCount, m1.MujocoStepsPerSecond, m2.ObjectCount, m2.MujocoStepsPerSecond, 100000);
+        return new BenchmarkResult(100000, BenchmarkDurationSec, godot, mujoco, true);
+    }
+
+    private static double ExtrapolatePowerLaw(int x1, double y1, int x2, double y2, int xTarget)
+    {
+        if (x1 <= 0 || x2 <= 0 || xTarget <= 0 || y1 <= 0.0 || y2 <= 0.0)
+        {
+            return 0.0;
+        }
+
+        double b = Math.Log(y2 / y1) / Math.Log((double)x2 / x1);
+        double a = y1 / Math.Pow(x1, b);
+        return a * Math.Pow(xTarget, b);
+    }
+
+    private readonly struct BenchmarkResult
+    {
+        public BenchmarkResult(int objectCount, double durationSec, double godotStepsPerSecond, double mujocoStepsPerSecond, bool isEstimated = false)
+        {
+            ObjectCount = objectCount;
+            DurationSec = durationSec;
+            GodotStepsPerSecond = godotStepsPerSecond;
+            MujocoStepsPerSecond = mujocoStepsPerSecond;
+            IsEstimated = isEstimated;
+        }
+
+        public int ObjectCount { get; }
+        public double DurationSec { get; }
+        public double GodotStepsPerSecond { get; }
+        public double MujocoStepsPerSecond { get; }
+        public bool IsEstimated { get; }
+        public double Ratio => GodotStepsPerSecond > 0.0 ? MujocoStepsPerSecond / GodotStepsPerSecond : 0.0;
     }
 }
