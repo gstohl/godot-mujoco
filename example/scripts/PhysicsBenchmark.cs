@@ -13,27 +13,29 @@ public partial class PhysicsBenchmark : Node3D
 
     public override async void _Ready()
     {
-        Engine.PhysicsTicksPerSecond = 60;
-
         GD.Print("=== Physics Benchmark (1000 objects) ===");
         GD.Print("Steps: " + BenchmarkSteps + " at dt=" + TimeStep);
 
-        double godotStepsPerSec = await RunGodotPhysicsBenchmark();
-        double mujocoStepsPerSec = RunMujocoBenchmark();
+        double godotRealtime = await RunGodotPhysicsBenchmark(60);
+        double godotUncapped = await RunGodotPhysicsBenchmark(20000);
+        double mujocoUncapped = RunMujocoBenchmark();
 
         GD.Print("--- Results ---");
-        GD.Print("Godot physics steps/sec: " + godotStepsPerSec.ToString("F2"));
-        GD.Print("MuJoCo steps/sec: " + mujocoStepsPerSec.ToString("F2"));
-        if (godotStepsPerSec > 0.0)
+        GD.Print("Godot physics steps/sec (60Hz mode): " + godotRealtime.ToString("F2"));
+        GD.Print("Godot physics steps/sec (uncapped mode): " + godotUncapped.ToString("F2"));
+        GD.Print("MuJoCo steps/sec (uncapped mode): " + mujocoUncapped.ToString("F2"));
+        if (godotUncapped > 0.0)
         {
-            GD.Print("MuJoCo/Godot ratio: " + (mujocoStepsPerSec / godotStepsPerSec).ToString("F2") + "x");
+            GD.Print("MuJoCo/Godot ratio (uncapped): " + (mujocoUncapped / godotUncapped).ToString("F2") + "x");
         }
 
         GetTree().Quit();
     }
 
-    private async Task<double> RunGodotPhysicsBenchmark()
+    private async Task<double> RunGodotPhysicsBenchmark(int physicsTicksPerSecond)
     {
+        Engine.PhysicsTicksPerSecond = physicsTicksPerSecond;
+
         var root = new Node3D { Name = "GodotBenchmarkRoot" };
         AddChild(root);
 
