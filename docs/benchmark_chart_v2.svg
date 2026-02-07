@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="470" viewBox="0 0 1100 470" role="img" aria-label="Physics benchmark chart">
+  <rect width="1100" height="470" fill="#0b1020" />
+  <text x="28" y="42" fill="#f3f7ff" font-family="Arial, sans-serif" font-size="24" font-weight="700">Physics Benchmark: Steps/sec by Sphere Count and Engine</text>
+  <text x="28" y="68" fill="#9fb1d0" font-family="Arial, sans-serif" font-size="14">X-axis = steps/sec (uncapped). Y-axis = sphere-count/engine rows.</text>
+
+  <line x1="260" y1="410" x2="1040" y2="410" stroke="#4e5f82" stroke-width="2"/>
+  <line x1="260" y1="100" x2="260" y2="410" stroke="#4e5f82" stroke-width="2"/>
+
+  <text x="250" y="430" fill="#89a1c8" font-family="Arial, sans-serif" font-size="12">0</text>
+  <text x="430" y="430" fill="#89a1c8" font-family="Arial, sans-serif" font-size="12">2000</text>
+  <text x="610" y="430" fill="#89a1c8" font-family="Arial, sans-serif" font-size="12">4000</text>
+  <text x="790" y="430" fill="#89a1c8" font-family="Arial, sans-serif" font-size="12">6000</text>
+  <text x="970" y="430" fill="#89a1c8" font-family="Arial, sans-serif" font-size="12">8000</text>
+
+  <line x1="440" y1="100" x2="440" y2="410" stroke="#24324d" stroke-width="1"/>
+  <line x1="620" y1="100" x2="620" y2="410" stroke="#24324d" stroke-width="1"/>
+  <line x1="800" y1="100" x2="800" y2="410" stroke="#24324d" stroke-width="1"/>
+  <line x1="980" y1="100" x2="980" y2="410" stroke="#24324d" stroke-width="1"/>
+
+  <text x="28" y="122" fill="#d7e4ff" font-family="Arial, sans-serif" font-size="13">100 / Godot</text>
+  <rect x="260" y="106" width="113" height="16" fill="#66c2ff" rx="4"/>
+  <text x="380" y="119" fill="#d7f0ff" font-family="Arial, sans-serif" font-size="12">1160.72</text>
+
+  <text x="28" y="150" fill="#d7ffe8" font-family="Arial, sans-serif" font-size="13">100 / MuJoCo</text>
+  <rect x="260" y="134" width="742" height="16" fill="#3de3a2" rx="4"/>
+  <text x="1010" y="147" fill="#d7ffe8" font-family="Arial, sans-serif" font-size="12">7608.90</text>
+
+  <text x="28" y="202" fill="#d7e4ff" font-family="Arial, sans-serif" font-size="13">1000 / Godot</text>
+  <rect x="260" y="186" width="56" height="16" fill="#66c2ff" rx="4"/>
+  <text x="322" y="199" fill="#d7f0ff" font-family="Arial, sans-serif" font-size="12">571.64</text>
+
+  <text x="28" y="230" fill="#d7ffe8" font-family="Arial, sans-serif" font-size="13">1000 / MuJoCo</text>
+  <rect x="260" y="214" width="68" height="16" fill="#3de3a2" rx="4"/>
+  <text x="334" y="227" fill="#d7ffe8" font-family="Arial, sans-serif" font-size="12">699.31</text>
+
+  <text x="28" y="282" fill="#d7e4ff" font-family="Arial, sans-serif" font-size="13">10000 / Godot</text>
+  <rect x="260" y="266" width="4" height="16" fill="#66c2ff" rx="2"/>
+  <text x="270" y="279" fill="#d7f0ff" font-family="Arial, sans-serif" font-size="12">36.12</text>
+
+  <text x="28" y="310" fill="#d7ffe8" font-family="Arial, sans-serif" font-size="13">10000 / MuJoCo</text>
+  <rect x="260" y="294" width="2" height="16" fill="#3de3a2" rx="2"/>
+  <text x="270" y="307" fill="#d7ffe8" font-family="Arial, sans-serif" font-size="12">6.98</text>
+
+  <text x="28" y="452" fill="#9fb1d0" font-family="Arial, sans-serif" font-size="12">Scale note: bars are linear against max 8000 steps/sec, so low-step rows appear near axis (correct behavior for this scale).</text>
+</svg>

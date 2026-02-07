@@ -142,7 +142,7 @@ Run headless:
 
 ### Benchmark Report (Current)
 
-![Benchmark Chart](docs/benchmark_chart.svg)
+![Benchmark Chart](docs/benchmark_chart_v2.svg)
 
 Scene coverage:
 
