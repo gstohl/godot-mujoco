@@ -16,12 +16,10 @@ public partial class PhysicsBenchmark : Node3D
         GD.Print("=== Physics Benchmark (1000 objects) ===");
         GD.Print("Steps: " + BenchmarkSteps + " at dt=" + TimeStep);
 
-        double godotRealtime = await RunGodotPhysicsBenchmark(60);
         double godotUncapped = await RunGodotPhysicsBenchmark(20000);
         double mujocoUncapped = RunMujocoBenchmark();
 
         GD.Print("--- Results ---");
-        GD.Print("Godot physics steps/sec (60Hz mode): " + godotRealtime.ToString("F2"));
         GD.Print("Godot physics steps/sec (uncapped mode): " + godotUncapped.ToString("F2"));
         GD.Print("MuJoCo steps/sec (uncapped mode): " + mujocoUncapped.ToString("F2"));
         if (godotUncapped > 0.0)

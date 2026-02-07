@@ -1,27 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="460" viewBox="0 0 900 460" role="img" aria-label="Uncapped physics benchmark chart">
-  <rect width="900" height="460" fill="#0b1020" />
-  <text x="34" y="42" fill="#f3f7ff" font-family="Arial, sans-serif" font-size="26" font-weight="700">1000-Object Physics Benchmark</text>
-  <text x="34" y="68" fill="#9fb1d0" font-family="Arial, sans-serif" font-size="14">Headless, dt=1/60, 600 steps. Includes capped and uncapped runs.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-label="Uncapped physics benchmark chart">
+  <rect width="900" height="430" fill="#0b1020" />
+  <text x="34" y="42" fill="#f3f7ff" font-family="Arial, sans-serif" font-size="26" font-weight="700">1000-Object Physics Benchmark (Uncapped)</text>
+  <text x="34" y="68" fill="#9fb1d0" font-family="Arial, sans-serif" font-size="14">Headless, dt=1/60, 600 steps</text>
 
-  <line x1="190" y1="360" x2="840" y2="360" stroke="#4e5f82" stroke-width="2" />
-  <line x1="190" y1="120" x2="190" y2="360" stroke="#4e5f82" stroke-width="2" />
+  <line x1="190" y1="340" x2="840" y2="340" stroke="#4e5f82" stroke-width="2" />
+  <line x1="190" y1="130" x2="190" y2="340" stroke="#4e5f82" stroke-width="2" />
 
-  <text x="150" y="365" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">0</text>
-  <text x="140" y="305" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">120</text>
-  <text x="140" y="245" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">240</text>
-  <text x="140" y="185" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">360</text>
+  <text x="150" y="345" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">0</text>
+  <text x="140" y="290" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">120</text>
+  <text x="140" y="240" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">240</text>
+  <text x="140" y="190" fill="#89a1c8" font-family="Arial, sans-serif" font-size="13">360</text>
 
-  <line x1="190" y1="300" x2="840" y2="300" stroke="#2d3a55" stroke-width="1" />
-  <line x1="190" y1="240" x2="840" y2="240" stroke="#2d3a55" stroke-width="1" />
-  <line x1="190" y1="180" x2="840" y2="180" stroke="#2d3a55" stroke-width="1" />
+  <line x1="190" y1="285" x2="840" y2="285" stroke="#2d3a55" stroke-width="1" />
+  <line x1="190" y1="235" x2="840" y2="235" stroke="#2d3a55" stroke-width="1" />
+  <line x1="190" y1="185" x2="840" y2="185" stroke="#2d3a55" stroke-width="1" />
 
-  <rect x="220" y="326" width="95" height="34" rx="6" fill="#5aa8ff" />
-  <rect x="220" y="252" width="600" height="34" rx="6" fill="#66c2ff" />
-  <rect x="220" y="225" width="620" height="34" rx="6" fill="#3de3a2" />
+  <rect x="220" y="240" width="566" height="36" rx="6" fill="#66c2ff" />
+  <rect x="220" y="214" width="617" height="36" rx="6" fill="#3de3a2" />
 
-  <text x="330" y="347" fill="#d7e4ff" font-family="Arial, sans-serif" font-size="14" font-weight="700">Godot 60Hz: 60.47</text>
-  <text x="330" y="273" fill="#d7f0ff" font-family="Arial, sans-serif" font-size="14" font-weight="700">Godot uncapped: 383.13</text>
-  <text x="330" y="246" fill="#0b1020" font-family="Arial, sans-serif" font-size="14" font-weight="700">MuJoCo uncapped: 436.86</text>
+  <text x="230" y="232" fill="#d7f0ff" font-family="Arial, sans-serif" font-size="14" font-weight="700">Godot uncapped: 397.98 steps/sec</text>
+  <text x="230" y="206" fill="#0b1020" font-family="Arial, sans-serif" font-size="14" font-weight="700">MuJoCo uncapped: 434.22 steps/sec</text>
 
-  <text x="34" y="422" fill="#9fb1d0" font-family="Arial, sans-serif" font-size="14">Uncapped ratio: MuJoCo / Godot = 1.14x</text>
+  <text x="34" y="396" fill="#9fb1d0" font-family="Arial, sans-serif" font-size="14">MuJoCo / Godot uncapped ratio: 1.09x</text>
 </svg>

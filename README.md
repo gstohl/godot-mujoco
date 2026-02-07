@@ -132,7 +132,7 @@ What it does:
 
 - Spawns 1000 dynamic spheres in Godot physics and measures physics-frame throughput.
 - Generates a MuJoCo XML with 1000 free bodies and runs the same number of fixed steps.
-- Uses `dt = 1/60` and prints both capped (60 Hz) and uncapped throughput.
+- Uses `dt = 1/60` and prints uncapped throughput.
 
 Run headless:
 
@@ -158,10 +158,9 @@ Test config:
 
 Measured result (latest run):
 
-- Godot physics (60 Hz mode): `60.47 steps/sec`
-- Godot physics (uncapped mode): `383.13 steps/sec`
-- MuJoCo (uncapped mode): `436.86 steps/sec`
-- Ratio (uncapped): `1.14x` (MuJoCo/Godot)
+- Godot physics (uncapped mode): `397.98 steps/sec`
+- MuJoCo (uncapped mode): `434.22 steps/sec`
+- Ratio (uncapped): `1.09x` (MuJoCo/Godot)
 
 Interpretation:
 
