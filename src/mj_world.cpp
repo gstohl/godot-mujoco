@@ -322,12 +322,8 @@ Transform3D MjWorld::body_world_transform(int body_index) const {
 }
 
 String MjWorld::get_mujoco_version() const {
-	// mj_version() encodes version as major*100 + minor*10 + patch (e.g. 340).
-	const int ver = mj_version();
-	const int major = ver / 100;
-	const int minor = (ver / 10) % 10;
-	const int patch = ver % 10;
-	return String::num_int64(major) + "." + String::num_int64(minor) + "." + String::num_int64(patch);
+	// mj_versionString() returns the full semantic version (e.g. "3.12.0").
+	return String(mj_versionString());
 }
 
 String MjWorld::get_last_error() const {

@@ -26,7 +26,7 @@ native `MjWorld` node usable from **GDScript and C#**.
 
 - CMake ≥ 3.20 and a C++17 compiler (`g++` / `clang++` / MSVC).
 - Network access on first configure (to fetch MuJoCo + godot-cpp).
-- A standard Godot 4.6 binary to run the demo.
+- A standard Godot 4.7 binary to run the demo.
 
 Nothing else — MuJoCo is fetched automatically.
 
@@ -39,21 +39,21 @@ cmake --build build -j
 
 This will:
 
-1. Download the pinned prebuilt **MuJoCo** release (default `3.4.0`) for your
+1. Download the pinned prebuilt **MuJoCo** release (default `3.12.0`) for your
    platform and verify its checksum.
 2. Fetch and build **godot-cpp** (`godot-4.5-stable`, forward-compatible with
-   Godot 4.6).
+   Godot 4.6/4.7).
 3. Build the extension and **stage everything** into
    `demo/addons/godot_mujoco/bin/`:
    - `libgodot_mujoco.<platform>.<target>.<arch>.so|.dylib|.dll`
-   - the MuJoCo runtime (`libmujoco.so.3.4.0`, etc.)
+   - the MuJoCo runtime (`libmujoco.so.3.12.0`, etc.)
 
 > On distros whose default `cc`/`c++` points at Clang and can't find `libstdc++`,
 > configure with `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
 
 ### Useful CMake options
 
-- `-DMUJOCO_VERSION=3.4.0` — MuJoCo release to fetch.
+- `-DMUJOCO_VERSION=3.12.0` — MuJoCo release to fetch.
 - `-DGODOT_CPP_TAG=godot-4.5-stable` — godot-cpp tag to build against.
 - `-DGMJ_ADDON_BIN=/path/to/bin` — where to stage the built binaries.
 

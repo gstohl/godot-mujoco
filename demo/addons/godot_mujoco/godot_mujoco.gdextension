@@ -13,7 +13,7 @@ windows.debug.x86_64 = "res://addons/godot_mujoco/bin/libgodot_mujoco.windows.te
 windows.release.x86_64 = "res://addons/godot_mujoco/bin/libgodot_mujoco.windows.template_release.x86_64.dll"
 
 [dependencies]
-linux.debug.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.4.0" : "" }
-linux.release.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.4.0" : "" }
+linux.debug.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.12.0" : "" }
+linux.release.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.12.0" : "" }
 windows.debug.x86_64 = { "res://addons/godot_mujoco/bin/mujoco.dll" : "" }
 windows.release.x86_64 = { "res://addons/godot_mujoco/bin/mujoco.dll" : "" }

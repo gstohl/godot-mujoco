@@ -6,7 +6,7 @@ include(FetchContent)
 # ---------------------------------------------------------------------------
 # Options
 # ---------------------------------------------------------------------------
-set(MUJOCO_VERSION "3.4.0" CACHE STRING "MuJoCo release version to fetch")
+set(MUJOCO_VERSION "3.12.0" CACHE STRING "MuJoCo release version to fetch")
 set(GODOT_CPP_TAG "godot-4.5-stable" CACHE STRING "godot-cpp git tag to build against")
 
 # Where the built extension + MuJoCo runtime are staged so the demo project
@@ -26,8 +26,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(_mj_asset "mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz")
   endif()
   # Pin the linux-x86_64 archive for supply-chain integrity.
-  if(MUJOCO_VERSION STREQUAL "3.4.0" AND _mj_asset MATCHES "linux-x86_64")
-    set(_mj_hash "SHA256=3b0e47d8880da0005b61fe5e43a4d058eb5097e6e3ba44f4a23ce2b5fab2244d")
+  if(MUJOCO_VERSION STREQUAL "3.12.0" AND _mj_asset MATCHES "linux-x86_64")
+    set(_mj_hash "SHA256=a9367911e6d5eaeade17c2197304687421c1fc932cdf7bcd4cb8cfaf0374dcb2")
   endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(_mj_asset "mujoco-${MUJOCO_VERSION}-windows-x86_64.zip")
