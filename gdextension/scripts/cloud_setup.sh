@@ -36,8 +36,25 @@ if [ -d "$REPO_ROOT/gdextension" ]; then
     -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
   cmake --build "$REPO_ROOT/gdextension/build" -j "$(nproc)"
 
-  echo "[cloud_setup] Importing demo project..."
-  "$GODOT_BIN" --headless --path "$REPO_ROOT/gdextension/demo" --import || true
+  # Import/scan pass. This registers the GDExtension (writes
+  # .godot/extension_list.cfg) so the native MjWorld class is available to
+  # GDScript at runtime. Godot's headless editor can segfault on teardown
+  # *after* the registration is written, so tolerate a non-zero exit here.
+  echo "[cloud_setup] Importing demo project (registers the GDExtension)..."
+  timeout 180 "$GODOT_BIN" --headless --path "$REPO_ROOT/gdextension/demo" --import || true
+
+  # Validate end-to-end: the headless smoke test loads the model and steps
+  # MuJoCo entirely in-engine. Match the PASS marker rather than the exit code,
+  # since the headless renderer can segfault on teardown after a clean quit.
+  echo "[cloud_setup] Running headless MuJoCo smoke test..."
+  if timeout 120 "$GODOT_BIN" --headless --path "$REPO_ROOT/gdextension/demo" res://HeadlessTest.tscn 2>&1 \
+      | tee /tmp/gmj_smoke.log | grep -q "SMOKE TEST: PASS"; then
+    echo "[cloud_setup] Smoke test PASSED."
+  else
+    echo "[cloud_setup] Smoke test FAILED:"
+    cat /tmp/gmj_smoke.log
+    exit 1
+  fi
 else
   echo "[cloud_setup] gdextension/ not present on this branch; skipping build."
 fi
