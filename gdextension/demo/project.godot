@@ -1,0 +1,14 @@
+; Engine configuration file.
+; Godot MuJoCo GDExtension demo — standard (non-.NET) Godot build.
+
+config_version=5
+
+[application]
+
+config/name="Godot MuJoCo GDExtension Demo"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.6")
+
+[physics]
+
+common/physics_ticks_per_second=60
