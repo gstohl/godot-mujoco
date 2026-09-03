@@ -72,6 +72,15 @@ sensors and body pose, exits non-zero on failure — suitable for CI):
 godot --headless --path demo res://HeadlessTest.tscn
 ```
 
+Chaotic **double pendulum** — a visual demo and a headless test that shows
+sensitive dependence on initial conditions (a 1e-5 rad perturbation diverges to
+O(1)), which also exercises multi-instance isolation:
+
+```bash
+godot --path demo res://ChaosPendulum.tscn              # visual
+godot --headless --path demo res://ChaosPendulumTest.tscn  # numerical chaos test
+```
+
 ## Using `MjWorld` from GDScript
 
 ```gdscript

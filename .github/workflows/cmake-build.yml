@@ -45,3 +45,9 @@ jobs:
           ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
             | tee smoke.log
           grep -q "SMOKE TEST: PASS" smoke.log
+
+      - name: Chaos double-pendulum test
+        run: |
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://ChaosPendulumTest.tscn 2>&1 \
+            | tee chaos.log
+          grep -q "CHAOS TEST: PASS" chaos.log
