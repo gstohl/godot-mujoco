@@ -37,6 +37,7 @@ func _physics_process(_delta: float) -> void:
 	world.set_ctrl(motor_id, 0.25 * sin(t * 2.0))
 	world.step(2)
 
-	# MuJoCo hinge angle drives the mesh rotation (Z-up sim -> Y-up Godot).
+	# MuJoCo hinge angle drives the mesh rotation. The hinge axis is MuJoCo +Y,
+	# which maps to Godot -Z, so negate the angle for a faithful direction.
 	var angle: float = world.get_qpos()[0]
-	pendulum.rotation = Vector3(0.0, 0.0, angle)
+	pendulum.rotation = Vector3(0.0, 0.0, -angle)

@@ -29,7 +29,15 @@ jobs:
           test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.x86_64.so
           test -f demo/addons/godot_mujoco/bin/libmujoco.so.3.12.0
           objdump -p demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.x86_64.so \
-            | grep -E 'NEEDED|RUNPATH'
+            | tee /tmp/objdump.txt
+          grep -q 'RUNPATH .*\$ORIGIN' /tmp/objdump.txt
+          grep -q 'NEEDED .*libmujoco.so.3.12.0' /tmp/objdump.txt
+
+      - name: Build release variant (export target)
+        run: |
+          cmake -S . -B build-release -DGODOTCPP_TARGET=template_release
+          cmake --build build-release -j "$(nproc)"
+          test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_release.x86_64.so
 
       - name: Download Godot 4.7.2
         run: |

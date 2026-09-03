@@ -28,6 +28,7 @@ func _physics_process(_delta: float) -> void:
 		return
 	world.step(4) # 4 * 0.005s per 1/60s frame
 	var q := world.get_qpos()
-	# shoulder is absolute; elbow is relative — nesting composes them for us.
-	upper_pivot.rotation = Vector3(0.0, 0.0, float(q[0]))
-	lower_pivot.rotation = Vector3(0.0, 0.0, float(q[1]))
+	# Hinge axis is MuJoCo +Y (maps to Godot -Z); shoulder is absolute, elbow is
+	# relative — nesting composes them for us.
+	upper_pivot.rotation = Vector3(0.0, 0.0, -float(q[0]))
+	lower_pivot.rotation = Vector3(0.0, 0.0, -float(q[1]))

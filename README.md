@@ -6,10 +6,13 @@ MuJoCo runs *in-engine* — there is **no bridge library** to call through and
 **no manual MuJoCo install**. The MuJoCo runtime is downloaded and bundled
 automatically by the build, and the extension is loaded directly by the engine.
 It targets the **standard Godot build** (no .NET/Mono requirement) and exposes a
-native `MjWorld` node usable from **GDScript and C#**.
+native `MjWorld` node usable from **GDScript** (and from C# via the engine's
+`ClassDB` — see [Using from C#](#using-from-c)).
 
-> Scope: **desktop** (Linux / Windows / macOS). Mobile (iOS/Android) is a
-> documented follow-up — see [Mobile](#mobile-ios--android).
+> Scope: **desktop**. Linux x86_64 is built and tested in CI; Windows is wired
+> and the release archive is checksum-pinned; macOS needs a pre-extracted MuJoCo
+> (see [Platforms](#platforms)) because its release ships as a `.dmg`.
+> Mobile (iOS/Android) is a documented follow-up — see [Mobile](#mobile-ios--android).
 
 ![Chaotic double pendulum simulated by MuJoCo inside Godot](docs/chaos_double_pendulum.gif)
 
@@ -27,8 +30,8 @@ frames, joint axes and center of mass. See [`VisualDebug.tscn`](demo/VisualDebug
 - Zero-step packaging: `cmake --build` fetches + bundles MuJoCo and resolves it
   via `$ORIGIN` / `@loader_path` — no `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` /
   `PATH` changes.
-- Usable from GDScript and C#; drop a node in a scene and simulate with zero code
-  via the `auto_step` property.
+- Usable from GDScript (and C# via `ClassDB`); drop a node in a scene and
+  simulate with zero code via the `auto_step` property.
 - Batch state I/O, full body pose (position + orientation), sensors, and clock
   access for low-overhead per-tick integration.
 - Built-in **visual debug** overlay (`MjDebugDraw`): contact points, force
@@ -36,7 +39,7 @@ frames, joint axes and center of mass. See [`VisualDebug.tscn`](demo/VisualDebug
 
 ## Requirements
 
-- CMake ≥ 3.20 and a C++17 compiler (`g++` / `clang++` / MSVC).
+- CMake ≥ 3.24 and a C++17 compiler (`g++` / `clang++` / MSVC).
 - Network access on first configure (to fetch MuJoCo + godot-cpp).
 - A standard Godot 4.7 binary to run the demo.
 
@@ -45,20 +48,29 @@ Nothing else — MuJoCo is fetched automatically.
 ## Build
 
 ```bash
-cmake -S . -B build
+cmake -S . -B build                 # editor / debug (default GODOTCPP_TARGET=template_debug)
 cmake --build build -j
 ```
 
 This will:
 
-1. Download the pinned prebuilt **MuJoCo** release (default `3.12.0`) for your
-   platform and verify its checksum.
+1. Download the pinned prebuilt **MuJoCo** release (default `3.12.0`) and verify
+   its SHA-256. All shipped archives (Linux x86_64/aarch64, Windows x86_64) are
+   pinned; fetching an unpinned archive fails unless `-DGMJ_ALLOW_UNVERIFIED=ON`.
 2. Fetch and build **godot-cpp** (`godot-4.5-stable`, forward-compatible with
    Godot 4.6/4.7).
 3. Build the extension and **stage everything** into
    `demo/addons/godot_mujoco/bin/`:
    - `libgodot_mujoco.<platform>.<target>.<arch>.so|.dylib|.dll`
    - the MuJoCo runtime (`libmujoco.so.3.12.0`, etc.)
+
+For an **exported game** you also need the release variant (the `.gdextension`
+maps release feature tags to `*.template_release.*`):
+
+```bash
+cmake -S . -B build-release -DGODOTCPP_TARGET=template_release
+cmake --build build-release -j
+```
 
 > On distros whose default `cc`/`c++` points at Clang and can't find `libstdc++`,
 > configure with `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
@@ -67,7 +79,11 @@ This will:
 
 - `-DMUJOCO_VERSION=3.12.0` — MuJoCo release to fetch.
 - `-DGODOT_CPP_TAG=godot-4.5-stable` — godot-cpp tag to build against.
+- `-DGODOTCPP_TARGET=template_debug|template_release` — build variant.
 - `-DGMJ_ADDON_BIN=/path/to/bin` — where to stage the built binaries.
+- `-DGMJ_MUJOCO_ROOT=/path/to/mujoco` — use a pre-extracted MuJoCo instead of
+  fetching (required on macOS; also an offline / custom-version escape hatch).
+- `-DGMJ_ALLOW_UNVERIFIED=ON` — permit fetching an archive with no pinned hash.
 
 ## Run
 
@@ -184,9 +200,20 @@ balls whose resting contact forces sum to their weight.
 
 ## Using from C#
 
-The extension registers `MjWorld` engine-wide, so it is equally available to C#
-(`Godot.NET`) projects — construct `new MjWorld()`, add it to the tree, and call
-the same methods. No P/Invoke and no separate bridge assembly.
+`MjWorld` is registered engine-wide, so it is reachable from C# (`Godot.NET`)
+projects through the engine's `ClassDB` — there is no generated managed type, so
+you construct and call it dynamically:
+
+```csharp
+var world = (Node)ClassDB.Instantiate("MjWorld");
+AddChild(world);
+world.Call("load_model", "res://models/pendulum.xml");
+world.Call("step", 10);
+```
+
+No P/Invoke and no separate bridge assembly. (A typed C# wrapper is not provided;
+`new MjWorld()` won't compile because GDExtension classes aren't exposed as C#
+types.)
 
 ## Project layout
 
@@ -234,6 +261,28 @@ demand)
 Adding a wrapper is typically a few lines in `src/mj_world.cpp` plus a
 `ClassDB::bind_method` entry. Open an issue for the calls you need.
 
+## Loading models in exported games
+
+`load_model()` reads the file through Godot's filesystem (`FileAccess`) and hands
+the bytes to MuJoCo via its in-memory VFS, so `res://` models work in an
+**exported** game, not just the editor. Two caveats:
+
+- Add your `.xml`/`.mjcf` (and any referenced meshes) to the export's
+  non-resource filter so they're packed, or load from a string with
+  `load_model_from_string(xml_text)`.
+- Self-contained MJCF works out of the box; MJCF `<include>`/mesh assets that
+  reference other files are not yet added to the VFS.
+
+## Platforms
+
+- **Linux x86_64** — built and tested in CI (debug + release).
+- **Linux aarch64 / Windows x86_64** — archives are checksum-pinned and the
+  build is wired, but not yet exercised in CI.
+- **macOS** — the official release is a `.dmg` CMake can't extract; download and
+  mount it, then build with `-DGMJ_MUJOCO_ROOT=/path/to/mujoco-3.12.0`. (The
+  `.gdextension` currently expects a `.framework`; adjust it to the produced
+  `.dylib` name if you package for macOS.)
+
 ## Mobile (iOS / Android)
 
 Not included yet. MuJoCo ships **no official mobile prebuilts**, so mobile
@@ -244,4 +293,9 @@ GPU/OpenGL dependency, so this is feasible as a follow-up.
 
 ## Roadmap
 
-- Multi-phase plan: `docs/full_plan.md`
+Focused on being a solid MuJoCo integration for Godot:
+
+- Multi-file MJCF in the VFS (includes + mesh/texture assets) for exported games.
+- macOS `.dmg` extraction wired into the build; CI coverage for Windows/arm64.
+- Optional `Node3D` base so the sim can compose with a scene-graph transform.
+- Mobile via a from-source MuJoCo cross-compile (see above).

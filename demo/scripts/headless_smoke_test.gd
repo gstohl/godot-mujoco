@@ -59,8 +59,26 @@ func _ready() -> void:
 		world.get_potential_energy(), str(world.get_warnings())])
 	print("debug_info=%s" % str(world.get_debug_info()))
 
+	# Export-safe string load (uses MuJoCo's VFS; no filesystem path required).
+	var w2 := MjWorld.new()
+	add_child(w2)
+	var strload_ok := w2.load_model_from_string('<mujoco><worldbody><body name="b"><freejoint/><geom type="sphere" size="0.1"/></body></worldbody></mujoco>')
+	strload_ok = strload_ok and w2.get_nbody() == 2
+
+	# Loud error handling: a wrong-sized set_qpos must be rejected (returns false).
+	var bad_rejected: bool = not world.set_qpos(PackedFloat64Array([1.0, 2.0, 3.0]))
+	# UTF-8-safe name round-trip.
+	var name_roundtrip: bool = world.body_name(world.body_id("pendulum")) == "pendulum"
+	# step(0) must be a no-op.
+	var t_before := world.get_time()
+	world.step(0)
+	var step0_noop: bool = world.get_time() == t_before
+	print("checks: strload=%s bad_set_rejected=%s name_roundtrip=%s step0_noop=%s" % [
+		str(strload_ok), str(bad_rejected), str(name_roundtrip), str(step0_noop)])
+
 	var passed: bool = moved and body_id >= 0 and world.get_nq() == 1 and world.get_nu() == 1 \
-		and world.get_nsensor() == 2 and world.get_njnt() == 1 and sensor_matches_qpos
+		and world.get_nsensor() == 2 and world.get_njnt() == 1 and sensor_matches_qpos \
+		and strload_ok and bad_rejected and name_roundtrip and step0_noop
 	if passed:
 		print("SMOKE TEST: PASS")
 		get_tree().quit(0)

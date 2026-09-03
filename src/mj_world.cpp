@@ -1,7 +1,7 @@
 #include "mj_world.h"
 
 #include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/basis.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -28,39 +28,79 @@ void MjWorld::free_model() {
 }
 
 bool MjWorld::load_model(const String &xml_path) {
-	free_model();
-
 	if (xml_path.is_empty()) {
 		last_error = "model path is empty";
 		UtilityFunctions::push_error("MjWorld: " + last_error);
 		return false;
 	}
 
-	// Resolve res:// or user:// paths to an absolute filesystem path so MuJoCo
-	// can open them directly.
-	const String absolute = ProjectSettings::get_singleton()->globalize_path(xml_path);
+	// Read through Godot's filesystem rather than a raw OS path so res:// works
+	// in an exported game (packed into the PCK), not only in the editor.
+	const PackedByteArray bytes = FileAccess::get_file_as_bytes(xml_path);
+	if (bytes.is_empty()) {
+		last_error = "could not read model file: " + xml_path;
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
+
+	String name = xml_path.get_file();
+	if (name.is_empty()) {
+		name = "model.xml";
+	}
+	return load_model_from_buffer(bytes, name);
+}
+
+bool MjWorld::load_model_from_string(const String &xml_text, const String &virtual_name) {
+	if (xml_text.is_empty()) {
+		last_error = "model string is empty";
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
+	const String name = virtual_name.is_empty() ? String("model.xml") : virtual_name;
+	return load_model_from_buffer(xml_text.to_utf8_buffer(), name);
+}
+
+bool MjWorld::load_model_from_buffer(const PackedByteArray &bytes, const String &vfs_name) {
+	// Load via MuJoCo's virtual file system so no real filesystem path is
+	// required (works from PCK-packed resources and in-memory strings).
+	mjVFS vfs;
+	mj_defaultVFS(&vfs);
+	const CharString name_cs = vfs_name.utf8();
+	const int add_rc = mj_addBufferVFS(&vfs, name_cs.get_data(), bytes.ptr(), (int)bytes.size());
+	if (add_rc != 0) {
+		mj_deleteVFS(&vfs);
+		last_error = "mj_addBufferVFS failed (code " + String::num_int64(add_rc) + ")";
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
 
 	char error[1024] = { 0 };
-	model = mj_loadXML(absolute.utf8().get_data(), nullptr, error, sizeof(error));
-	if (model == nullptr) {
-		last_error = String(error);
+	mjModel *new_model = mj_loadXML(name_cs.get_data(), &vfs, error, sizeof(error));
+	mj_deleteVFS(&vfs);
+	if (new_model == nullptr) {
+		// Keep any currently loaded model intact (load-then-swap).
+		last_error = String::utf8(error);
 		UtilityFunctions::push_error("MjWorld: failed to load model: " + last_error);
 		return false;
 	}
 
-	data = mj_makeData(model);
-	if (data == nullptr) {
+	mjData *new_data = mj_makeData(new_model);
+	if (new_data == nullptr) {
+		mj_deleteModel(new_model);
 		last_error = "failed to allocate mjData";
 		UtilityFunctions::push_error("MjWorld: " + last_error);
-		mj_deleteModel(model);
-		model = nullptr;
 		return false;
 	}
 
-	// Enable energy computation so get_kinetic_energy()/get_potential_energy()
-	// and the debug snapshot report meaningful values.
-	model->opt.enableflags |= mjENBL_ENERGY;
+	// Enable energy computation and run forward once so kinematics, sensors,
+	// COM and energy are valid on the first frame (before any step()).
+	new_model->opt.enableflags |= mjENBL_ENERGY;
+	mj_forward(new_model, new_data);
 
+	// Success: swap in the new model/data and release the old.
+	free_model();
+	model = new_model;
+	data = new_data;
 	last_error = "";
 	return true;
 }
@@ -74,6 +114,8 @@ void MjWorld::reset() {
 		return;
 	}
 	mj_resetData(model, data);
+	// Recompute derived quantities so queries are valid immediately after reset.
+	mj_forward(model, data);
 }
 
 bool MjWorld::step(int n) {
@@ -81,8 +123,8 @@ bool MjWorld::step(int n) {
 		last_error = "world is not ready";
 		return false;
 	}
-	if (n < 1) {
-		n = 1;
+	if (n <= 0) {
+		return true; // no-op for zero/negative counts
 	}
 	for (int i = 0; i < n; ++i) {
 		mj_step(model, data);
@@ -168,7 +210,7 @@ String MjWorld::body_name(int id) const {
 		return String();
 	}
 	const char *name = mj_id2name(model, mjOBJ_BODY, id);
-	return name != nullptr ? String(name) : String();
+	return name != nullptr ? String::utf8(name) : String();
 }
 
 String MjWorld::joint_name(int id) const {
@@ -176,7 +218,7 @@ String MjWorld::joint_name(int id) const {
 		return String();
 	}
 	const char *name = mj_id2name(model, mjOBJ_JOINT, id);
-	return name != nullptr ? String(name) : String();
+	return name != nullptr ? String::utf8(name) : String();
 }
 
 String MjWorld::actuator_name(int id) const {
@@ -184,7 +226,7 @@ String MjWorld::actuator_name(int id) const {
 		return String();
 	}
 	const char *name = mj_id2name(model, mjOBJ_ACTUATOR, id);
-	return name != nullptr ? String(name) : String();
+	return name != nullptr ? String::utf8(name) : String();
 }
 
 String MjWorld::sensor_name(int id) const {
@@ -192,14 +234,22 @@ String MjWorld::sensor_name(int id) const {
 		return String();
 	}
 	const char *name = mj_id2name(model, mjOBJ_SENSOR, id);
-	return name != nullptr ? String(name) : String();
+	return name != nullptr ? String::utf8(name) : String();
 }
 
-void MjWorld::set_ctrl(int index, double value) {
-	if (!is_ready() || index < 0 || index >= model->nu) {
-		return;
+bool MjWorld::set_ctrl(int index, double value) {
+	if (!is_ready()) {
+		last_error = "world is not ready";
+		UtilityFunctions::push_error("MjWorld.set_ctrl: " + last_error);
+		return false;
+	}
+	if (index < 0 || index >= model->nu) {
+		last_error = "actuator index out of range: " + String::num_int64(index);
+		UtilityFunctions::push_error("MjWorld.set_ctrl: " + last_error);
+		return false;
 	}
 	data->ctrl[index] = (mjtNum)value;
+	return true;
 }
 
 double MjWorld::get_ctrl(int index) const {
@@ -221,14 +271,21 @@ PackedFloat64Array MjWorld::get_qpos() const {
 	return out;
 }
 
-void MjWorld::set_qpos(const PackedFloat64Array &values) {
+bool MjWorld::set_qpos(const PackedFloat64Array &values) {
 	if (!is_ready()) {
-		return;
+		last_error = "world is not ready";
+		UtilityFunctions::push_error("MjWorld.set_qpos: " + last_error);
+		return false;
 	}
-	const int count = MIN((int)values.size(), model->nq);
-	for (int i = 0; i < count; ++i) {
+	if ((int)values.size() != model->nq) {
+		last_error = "set_qpos expects " + String::num_int64(model->nq) + " values, got " + String::num_int64(values.size());
+		UtilityFunctions::push_error("MjWorld.set_qpos: " + last_error);
+		return false;
+	}
+	for (int i = 0; i < model->nq; ++i) {
 		data->qpos[i] = (mjtNum)values[i];
 	}
+	return true;
 }
 
 PackedFloat64Array MjWorld::get_qvel() const {
@@ -243,14 +300,21 @@ PackedFloat64Array MjWorld::get_qvel() const {
 	return out;
 }
 
-void MjWorld::set_qvel(const PackedFloat64Array &values) {
+bool MjWorld::set_qvel(const PackedFloat64Array &values) {
 	if (!is_ready()) {
-		return;
+		last_error = "world is not ready";
+		UtilityFunctions::push_error("MjWorld.set_qvel: " + last_error);
+		return false;
 	}
-	const int count = MIN((int)values.size(), model->nv);
-	for (int i = 0; i < count; ++i) {
+	if ((int)values.size() != model->nv) {
+		last_error = "set_qvel expects " + String::num_int64(model->nv) + " values, got " + String::num_int64(values.size());
+		UtilityFunctions::push_error("MjWorld.set_qvel: " + last_error);
+		return false;
+	}
+	for (int i = 0; i < model->nv; ++i) {
 		data->qvel[i] = (mjtNum)values[i];
 	}
+	return true;
 }
 
 PackedFloat64Array MjWorld::get_ctrl_array() const {
@@ -265,14 +329,21 @@ PackedFloat64Array MjWorld::get_ctrl_array() const {
 	return out;
 }
 
-void MjWorld::set_ctrl_array(const PackedFloat64Array &values) {
+bool MjWorld::set_ctrl_array(const PackedFloat64Array &values) {
 	if (!is_ready()) {
-		return;
+		last_error = "world is not ready";
+		UtilityFunctions::push_error("MjWorld.set_ctrl_array: " + last_error);
+		return false;
 	}
-	const int count = MIN((int)values.size(), model->nu);
-	for (int i = 0; i < count; ++i) {
+	if ((int)values.size() != model->nu) {
+		last_error = "set_ctrl_array expects " + String::num_int64(model->nu) + " values, got " + String::num_int64(values.size());
+		UtilityFunctions::push_error("MjWorld.set_ctrl_array: " + last_error);
+		return false;
+	}
+	for (int i = 0; i < model->nu; ++i) {
 		data->ctrl[i] = (mjtNum)values[i];
 	}
+	return true;
 }
 
 PackedFloat64Array MjWorld::get_sensordata() const {
@@ -327,7 +398,7 @@ Transform3D MjWorld::body_world_transform(int body_index) const {
 
 String MjWorld::get_mujoco_version() const {
 	// mj_versionString() returns the full semantic version (e.g. "3.12.0").
-	return String(mj_versionString());
+	return String::utf8(mj_versionString());
 }
 
 String MjWorld::get_last_error() const {
@@ -505,6 +576,7 @@ void MjWorld::_physics_process(double delta) {
 
 void MjWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("load_model", "xml_path"), &MjWorld::load_model);
+	ClassDB::bind_method(D_METHOD("load_model_from_string", "xml_text", "virtual_name"), &MjWorld::load_model_from_string, DEFVAL(String()));
 	ClassDB::bind_method(D_METHOD("free_model"), &MjWorld::free_model);
 	ClassDB::bind_method(D_METHOD("is_ready"), &MjWorld::is_ready);
 	ClassDB::bind_method(D_METHOD("reset"), &MjWorld::reset);

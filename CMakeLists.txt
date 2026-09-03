@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(godot_mujoco_gdextension CXX)
 
 include(FetchContent)
@@ -17,6 +17,8 @@ set(GMJ_ADDON_BIN "${CMAKE_CURRENT_SOURCE_DIR}/demo/addons/godot_mujoco/bin"
 # ---------------------------------------------------------------------------
 # Auto-fetch the prebuilt MuJoCo runtime (no manual install, no extra steps)
 # ---------------------------------------------------------------------------
+option(GMJ_ALLOW_UNVERIFIED "Allow fetching a MuJoCo archive that has no pinned checksum" OFF)
+
 set(_mj_base "https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -25,38 +27,49 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   else()
     set(_mj_asset "mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz")
   endif()
-  # Pin the linux-x86_64 archive for supply-chain integrity.
-  if(MUJOCO_VERSION STREQUAL "3.12.0" AND _mj_asset MATCHES "linux-x86_64")
-    set(_mj_hash "SHA256=a9367911e6d5eaeade17c2197304687421c1fc932cdf7bcd4cb8cfaf0374dcb2")
-  endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(_mj_asset "mujoco-${MUJOCO_VERSION}-windows-x86_64.zip")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  # The macOS release ships as a .dmg which CMake cannot extract; see README
-  # for the documented macOS bring-up path.
-  message(WARNING "Automatic MuJoCo fetch is not wired for macOS .dmg; see README.md")
+  # The macOS release ships as a .dmg which CMake cannot extract. Point the
+  # build at an already-extracted MuJoCo (the folder containing include/ and
+  # lib/) via -DGMJ_MUJOCO_ROOT=/path/to/mujoco-<ver>; see README "Platforms".
   set(_mj_asset "")
 endif()
 
-if(_mj_asset STREQUAL "")
-  message(FATAL_ERROR "No MuJoCo asset mapping for this platform (${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}).")
+# Pinned SHA-256 checksums per (version, asset) for supply-chain integrity.
+if(MUJOCO_VERSION STREQUAL "3.12.0")
+  if(_mj_asset MATCHES "linux-x86_64")
+    set(_mj_hash "SHA256=a9367911e6d5eaeade17c2197304687421c1fc932cdf7bcd4cb8cfaf0374dcb2")
+  elseif(_mj_asset MATCHES "linux-aarch64")
+    set(_mj_hash "SHA256=08fd5627a2ef7d5a42580c40e014ab2c1a644f082010c584ca361a3ed8cad838")
+  elseif(_mj_asset MATCHES "windows-x86_64")
+    set(_mj_hash "SHA256=ffe071c2747dd9513a1c59e7d2428bb678d887f9edec9eb9674b4288a248a8e9")
+  endif()
 endif()
 
-if(DEFINED _mj_hash)
-  FetchContent_Declare(mujoco URL "${_mj_base}/${_mj_asset}" URL_HASH "${_mj_hash}"
-      DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+# Allow pointing at a pre-extracted MuJoCo (required on macOS; also a general
+# offline / custom-version escape hatch).
+if(DEFINED GMJ_MUJOCO_ROOT AND NOT GMJ_MUJOCO_ROOT STREQUAL "")
+  set(mujoco_SOURCE_DIR "${GMJ_MUJOCO_ROOT}")
+elseif(_mj_asset STREQUAL "")
+  message(FATAL_ERROR "No MuJoCo archive is available for this platform "
+      "(${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}). Pass -DGMJ_MUJOCO_ROOT=/path/to/extracted/mujoco.")
 else()
-  FetchContent_Declare(mujoco URL "${_mj_base}/${_mj_asset}" DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  if(NOT DEFINED _mj_hash AND NOT GMJ_ALLOW_UNVERIFIED)
+    message(FATAL_ERROR "No pinned checksum for '${_mj_asset}'. Add its SHA-256 to CMakeLists.txt, "
+        "or pass -DGMJ_ALLOW_UNVERIFIED=ON to fetch it unverified.")
+  endif()
+  if(DEFINED _mj_hash)
+    FetchContent_Declare(mujoco URL "${_mj_base}/${_mj_asset}" URL_HASH "${_mj_hash}"
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  else()
+    FetchContent_Declare(mujoco URL "${_mj_base}/${_mj_asset}" DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  endif()
+  FetchContent_MakeAvailable(mujoco)
 endif()
-
-FetchContent_MakeAvailable(mujoco)
 
 set(MUJOCO_INCLUDE_DIR "${mujoco_SOURCE_DIR}/include")
-if(WIN32)
-  find_library(MUJOCO_LINK_LIB mujoco PATHS "${mujoco_SOURCE_DIR}/lib" NO_DEFAULT_PATH)
-else()
-  find_library(MUJOCO_LINK_LIB mujoco PATHS "${mujoco_SOURCE_DIR}/lib" NO_DEFAULT_PATH)
-endif()
+find_library(MUJOCO_LINK_LIB mujoco PATHS "${mujoco_SOURCE_DIR}/lib" NO_DEFAULT_PATH)
 
 if(NOT MUJOCO_LINK_LIB)
   message(FATAL_ERROR "Could not locate MuJoCo library under ${mujoco_SOURCE_DIR}/lib")

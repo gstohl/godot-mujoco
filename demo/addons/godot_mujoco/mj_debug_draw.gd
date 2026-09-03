@@ -3,9 +3,11 @@ extends Node3D
 
 # Visual debug overlay for an MjWorld: draws MuJoCo's debug geometry (contact
 # points, contact-force arrows, body frames, joint axes, center of mass) as
-# line primitives on top of the scene. Assign `world` and (optionally) tweak the
-# toggles/scales. MuJoCo is Z-up; this maps its world frame into Godot's Y-up.
+# line primitives on top of the scene. Assign `world` (in the inspector or from
+# code) and toggle what to show. MuJoCo is Z-up; this maps its world frame into
+# Godot's Y-up.
 
+@export var world: MjWorld
 @export var show_body_frames := true
 @export var show_joints := true
 @export var show_com := true
@@ -14,11 +16,10 @@ extends Node3D
 @export var axis_length := 0.2
 @export var force_scale := 0.008
 
-var world: MjWorld
-
 var _im := ImmediateMesh.new()
 var _mi := MeshInstance3D.new()
 var _mat := StandardMaterial3D.new()
+var _begun := false
 
 func _ready() -> void:
 	_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -34,9 +35,9 @@ func m2g(v: Vector3) -> Vector3:
 
 func _process(_delta: float) -> void:
 	_im.clear_surfaces()
-	if world == null or not world.is_ready():
+	_begun = false
+	if not is_instance_valid(world) or not world.is_ready():
 		return
-	_im.surface_begin(Mesh.PRIMITIVE_LINES)
 
 	if show_body_frames:
 		for i in range(1, world.get_nbody()):
@@ -63,9 +64,18 @@ func _process(_delta: float) -> void:
 				var f: Vector3 = m2g(c["force"]) * force_scale
 				_line(p, p + f, Color.ORANGE)
 
-	_im.surface_end()
+	# ImmediateMesh errors if surface_end() is called with no vertices, so only
+	# finish the surface when at least one line was drawn.
+	if _begun:
+		_im.surface_end()
+
+func _ensure_begun() -> void:
+	if not _begun:
+		_im.surface_begin(Mesh.PRIMITIVE_LINES)
+		_begun = true
 
 func _line(a: Vector3, b: Vector3, col: Color) -> void:
+	_ensure_begun()
 	_im.surface_set_color(col)
 	_im.surface_add_vertex(a)
 	_im.surface_set_color(col)

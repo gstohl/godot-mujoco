@@ -1,5 +1,6 @@
-# CMake build tree
+# CMake build trees
 /build/
+/build-release/
 
 # Godot import cache
 /demo/.godot/
