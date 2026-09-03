@@ -1,11 +1,12 @@
+# CMake build tree
 /build/
-/godot_demo/bin/*.dylib
-/godot_demo/bin/*.so
-/godot_demo/bin/*.dll
-/godot_demo/bin/mujoco.framework/
-/godot_demo/.godot/
-/example/bin/*.dylib
-/example/bin/*.so
-/example/bin/*.dll
-/example/bin/mujoco.framework/
-/example/.godot/
+
+# Godot import cache
+/demo/.godot/
+
+# Built + bundled binaries (produced by the CMake build, not source)
+/demo/addons/godot_mujoco/bin/*.so
+/demo/addons/godot_mujoco/bin/*.so.*
+/demo/addons/godot_mujoco/bin/*.dylib
+/demo/addons/godot_mujoco/bin/*.dll
+/demo/addons/godot_mujoco/bin/*.framework/

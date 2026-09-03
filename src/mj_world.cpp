@@ -3,6 +3,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/basis.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <mujoco/mujoco.h>
@@ -108,6 +109,28 @@ int MjWorld::get_nbody() const {
 	return is_ready() ? model->nbody : -1;
 }
 
+int MjWorld::get_njnt() const {
+	return is_ready() ? model->njnt : -1;
+}
+
+int MjWorld::get_nsensor() const {
+	return is_ready() ? model->nsensor : -1;
+}
+
+double MjWorld::get_time() const {
+	return is_ready() ? (double)data->time : 0.0;
+}
+
+double MjWorld::get_timestep() const {
+	return is_ready() ? (double)model->opt.timestep : 0.0;
+}
+
+void MjWorld::set_timestep(double dt) {
+	if (is_ready() && dt > 0.0) {
+		model->opt.timestep = (mjtNum)dt;
+	}
+}
+
 int MjWorld::body_id(const String &name) const {
 	if (!is_ready()) {
 		return -1;
@@ -127,6 +150,13 @@ int MjWorld::actuator_id(const String &name) const {
 		return -1;
 	}
 	return mj_name2id(model, mjOBJ_ACTUATOR, name.utf8().get_data());
+}
+
+int MjWorld::sensor_id(const String &name) const {
+	if (!is_ready()) {
+		return -1;
+	}
+	return mj_name2id(model, mjOBJ_SENSOR, name.utf8().get_data());
 }
 
 String MjWorld::body_name(int id) const {
@@ -150,6 +180,14 @@ String MjWorld::actuator_name(int id) const {
 		return String();
 	}
 	const char *name = mj_id2name(model, mjOBJ_ACTUATOR, id);
+	return name != nullptr ? String(name) : String();
+}
+
+String MjWorld::sensor_name(int id) const {
+	if (!is_ready() || id < 0 || id >= model->nsensor) {
+		return String();
+	}
+	const char *name = mj_id2name(model, mjOBJ_SENSOR, id);
 	return name != nullptr ? String(name) : String();
 }
 
@@ -233,12 +271,54 @@ void MjWorld::set_ctrl_array(const PackedFloat64Array &values) {
 	}
 }
 
+PackedFloat64Array MjWorld::get_sensordata() const {
+	PackedFloat64Array out;
+	if (!is_ready()) {
+		return out;
+	}
+	out.resize(model->nsensordata);
+	for (int i = 0; i < model->nsensordata; ++i) {
+		out.set(i, (double)data->sensordata[i]);
+	}
+	return out;
+}
+
+PackedFloat64Array MjWorld::get_sensor(int sensor_index) const {
+	PackedFloat64Array out;
+	if (!is_ready() || sensor_index < 0 || sensor_index >= model->nsensor) {
+		return out;
+	}
+	const int adr = model->sensor_adr[sensor_index];
+	const int dim = model->sensor_dim[sensor_index];
+	out.resize(dim);
+	for (int i = 0; i < dim; ++i) {
+		out.set(i, (double)data->sensordata[adr + i]);
+	}
+	return out;
+}
+
 Vector3 MjWorld::body_world_position(int body_index) const {
 	if (!is_ready() || body_index < 0 || body_index >= model->nbody) {
 		return Vector3();
 	}
 	const mjtNum *xpos = data->xpos + (3 * body_index);
 	return Vector3((float)xpos[0], (float)xpos[1], (float)xpos[2]);
+}
+
+Quaternion MjWorld::body_world_quaternion(int body_index) const {
+	if (!is_ready() || body_index < 0 || body_index >= model->nbody) {
+		return Quaternion();
+	}
+	// MuJoCo stores quaternions as (w, x, y, z); Godot's Quaternion is (x, y, z, w).
+	const mjtNum *q = data->xquat + (4 * body_index);
+	return Quaternion((float)q[1], (float)q[2], (float)q[3], (float)q[0]);
+}
+
+Transform3D MjWorld::body_world_transform(int body_index) const {
+	if (!is_ready() || body_index < 0 || body_index >= model->nbody) {
+		return Transform3D();
+	}
+	return Transform3D(Basis(body_world_quaternion(body_index)), body_world_position(body_index));
 }
 
 String MjWorld::get_mujoco_version() const {
@@ -310,13 +390,21 @@ void MjWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_nv"), &MjWorld::get_nv);
 	ClassDB::bind_method(D_METHOD("get_nu"), &MjWorld::get_nu);
 	ClassDB::bind_method(D_METHOD("get_nbody"), &MjWorld::get_nbody);
+	ClassDB::bind_method(D_METHOD("get_njnt"), &MjWorld::get_njnt);
+	ClassDB::bind_method(D_METHOD("get_nsensor"), &MjWorld::get_nsensor);
+
+	ClassDB::bind_method(D_METHOD("get_time"), &MjWorld::get_time);
+	ClassDB::bind_method(D_METHOD("get_timestep"), &MjWorld::get_timestep);
+	ClassDB::bind_method(D_METHOD("set_timestep", "dt"), &MjWorld::set_timestep);
 
 	ClassDB::bind_method(D_METHOD("body_id", "name"), &MjWorld::body_id);
 	ClassDB::bind_method(D_METHOD("joint_id", "name"), &MjWorld::joint_id);
 	ClassDB::bind_method(D_METHOD("actuator_id", "name"), &MjWorld::actuator_id);
+	ClassDB::bind_method(D_METHOD("sensor_id", "name"), &MjWorld::sensor_id);
 	ClassDB::bind_method(D_METHOD("body_name", "id"), &MjWorld::body_name);
 	ClassDB::bind_method(D_METHOD("joint_name", "id"), &MjWorld::joint_name);
 	ClassDB::bind_method(D_METHOD("actuator_name", "id"), &MjWorld::actuator_name);
+	ClassDB::bind_method(D_METHOD("sensor_name", "id"), &MjWorld::sensor_name);
 
 	ClassDB::bind_method(D_METHOD("set_ctrl", "index", "value"), &MjWorld::set_ctrl);
 	ClassDB::bind_method(D_METHOD("get_ctrl", "index"), &MjWorld::get_ctrl);
@@ -327,7 +415,12 @@ void MjWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_ctrl_array"), &MjWorld::get_ctrl_array);
 	ClassDB::bind_method(D_METHOD("set_ctrl_array", "values"), &MjWorld::set_ctrl_array);
 
+	ClassDB::bind_method(D_METHOD("get_sensordata"), &MjWorld::get_sensordata);
+	ClassDB::bind_method(D_METHOD("get_sensor", "sensor_index"), &MjWorld::get_sensor);
+
 	ClassDB::bind_method(D_METHOD("body_world_position", "body_index"), &MjWorld::body_world_position);
+	ClassDB::bind_method(D_METHOD("body_world_quaternion", "body_index"), &MjWorld::body_world_quaternion);
+	ClassDB::bind_method(D_METHOD("body_world_transform", "body_index"), &MjWorld::body_world_transform);
 
 	ClassDB::bind_method(D_METHOD("get_mujoco_version"), &MjWorld::get_mujoco_version);
 	ClassDB::bind_method(D_METHOD("get_last_error"), &MjWorld::get_last_error);

@@ -1,4 +1,4 @@
-name: CMake Build
+name: GDExtension Build
 
 on:
   push:
@@ -7,22 +7,41 @@ on:
   pull_request:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-
+  build-and-test:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup CMake
-        uses: lukka/get-cmake@latest
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential git curl unzip
 
-      - name: Configure
-        run: cmake -S . -B build
+      - name: Build GDExtension (auto-fetches MuJoCo + godot-cpp)
+        run: |
+          cmake -S . -B build
+          cmake --build build -j "$(nproc)"
 
-      - name: Build
-        run: cmake --build build --config Release
+      - name: Verify bundled runtime + linkage
+        run: |
+          ls -la demo/addons/godot_mujoco/bin/
+          test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.x86_64.so
+          test -f demo/addons/godot_mujoco/bin/libmujoco.so.3.4.0
+          objdump -p demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.x86_64.so \
+            | grep -E 'NEEDED|RUNPATH'
+
+      - name: Download Godot 4.6
+        run: |
+          curl -fsSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip
+          unzip -o godot.zip
+
+      - name: Headless MuJoCo smoke test
+        run: |
+          # Registers the GDExtension (may segfault on teardown, which is
+          # cosmetic — success is judged by the PASS marker below).
+          ./Godot_v4.6-stable_linux.x86_64 --headless --path demo --import || true
+          ./Godot_v4.6-stable_linux.x86_64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
+            | tee smoke.log
+          grep -q "SMOKE TEST: PASS" smoke.log

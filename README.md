@@ -1,233 +1,146 @@
 # godot-mujoco
 
-MuJoCo physics for Godot 4, available in two flavors:
+**Full [MuJoCo](https://mujoco.org) physics inside Godot 4, as a native GDExtension.**
 
-1. **GDExtension (recommended)** — full **in-engine** MuJoCo as a native
-   GDExtension. No bridge, **no manual MuJoCo install**, standard Godot build
-   (no .NET required), usable from **GDScript and C#**. Desktop today
-   (Linux/macOS/Windows); mobile is a documented follow-up. Lives in
-   [`gdextension/`](gdextension/README.md).
-2. **C bridge (original)** — a minimal C shared library exposing MuJoCo calls,
-   consumed from Godot .NET via P/Invoke. Documented in the second half of this
-   file.
+MuJoCo runs *in-engine* — there is **no bridge library** to call through and
+**no manual MuJoCo install**. The MuJoCo runtime is downloaded and bundled
+automatically by the build, and the extension is loaded directly by the engine.
+It targets the **standard Godot build** (no .NET/Mono requirement) and exposes a
+native `MjWorld` node usable from **GDScript and C#**.
 
-## Which should I use?
+> Scope: **desktop** (Linux / Windows / macOS). Mobile (iOS/Android) is a
+> documented follow-up — see [Mobile](#mobile-ios--android).
 
-| | GDExtension (`gdextension/`) | C bridge (repo root) |
-| --- | --- | --- |
-| Integration | MuJoCo runs in-engine as native nodes | thin C lib called via C# P/Invoke |
-| Interop cost | native `mj_step`, zero managed boundary | managed ↔ native per call (batched) |
-| Godot build | standard (no .NET required) | Godot .NET / Mono |
-| MuJoCo runtime | auto-fetched + bundled by the build | separate install / manual bundling |
-| Usable from | GDScript **and** C# | C# |
-| Manual steps | none | set loader paths / copy libs |
+## Highlights
 
-New to the project? Start with the [GDExtension](gdextension/README.md).
+- One native node, `MjWorld`, owns a full MuJoCo `mjModel` + `mjData`.
+- Zero-step packaging: `cmake --build` fetches + bundles MuJoCo and resolves it
+  via `$ORIGIN` / `@loader_path` — no `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` /
+  `PATH` changes.
+- Usable from GDScript and C#; drop a node in a scene and simulate with zero code
+  via the `auto_step` property.
+- Batch state I/O, full body pose (position + orientation), sensors, and clock
+  access for low-overhead per-tick integration.
 
-## Quick start — GDExtension (recommended)
+## Requirements
 
-```bash
-cmake -S gdextension -B gdextension/build
-cmake --build gdextension/build -j
-godot --path gdextension/demo                                     # visual pendulum demo
-godot --headless --path gdextension/demo res://HeadlessTest.tscn  # end-to-end proof
-```
+- CMake ≥ 3.20 and a C++17 compiler (`g++` / `clang++` / MSVC).
+- Network access on first configure (to fetch MuJoCo + godot-cpp).
+- A standard Godot 4.6 binary to run the demo.
 
-The build auto-downloads the pinned MuJoCo release and godot-cpp, then bundles the
-MuJoCo runtime next to the extension (resolved via `$ORIGIN` / `@loader_path`), so
-**no** `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` / `PATH` changes are needed. Add an
-`MjWorld` node, set `model_path`, and call `step()` — or enable `auto_step` for
-zero-code simulation. Full API and details in
-[`gdextension/README.md`](gdextension/README.md).
-
-> On distros whose default `cc`/`c++` points at Clang and can't find `libstdc++`,
-> configure with `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
-
----
-
-# C bridge (original approach)
-
-The remainder of this document covers the original C bridge: a minimal C shared
-library exposing MuJoCo runtime calls, consumed from Godot .NET via P/Invoke.
-
-## What is included
-
-- Opaque handles for `mjModel` and `mjData` (`gmj_model`, `gmj_data`)
-- Model lifecycle (`gmj_model_load_xml`, `gmj_model_free`)
-- Data lifecycle (`gmj_data_create`, `gmj_data_free`, `gmj_reset_data`)
-- Simulation stepping (`gmj_step`, `gmj_forward`)
-- State/control getters and setters (`qpos`, `qvel`, `ctrl`)
-- Name/ID lookup helpers for body/joint/actuator binding
-- Batch slice APIs for `qpos`, `qvel`, and `ctrl` sync
-- Body world position query (`gmj_body_world_position`)
-- Lightweight error string retrieval (`gmj_last_mujoco_error`)
-
-The API is declared in `include/godot_mujoco/gmj_bridge.h` and implemented in `src/gmj_bridge.c`.
+Nothing else — MuJoCo is fetched automatically.
 
 ## Build
 
 ```bash
 cmake -S . -B build
-cmake --build build
+cmake --build build -j
 ```
 
-This creates `godot_mujoco_bridge` as a shared library (`.dylib`, `.so`, or `.dll`).
+This will:
 
-By default, CMake also copies the built library into `godot_demo/bin/` and `example/bin/`.
+1. Download the pinned prebuilt **MuJoCo** release (default `3.4.0`) for your
+   platform and verify its checksum.
+2. Fetch and build **godot-cpp** (`godot-4.5-stable`, forward-compatible with
+   Godot 4.6).
+3. Build the extension and **stage everything** into
+   `demo/addons/godot_mujoco/bin/`:
+   - `libgodot_mujoco.<platform>.<target>.<arch>.so|.dylib|.dll`
+   - the MuJoCo runtime (`libmujoco.so.3.4.0`, etc.)
 
-## Run in Godot
+> On distros whose default `cc`/`c++` points at Clang and can't find `libstdc++`,
+> configure with `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
 
-This repository includes:
+### Useful CMake options
 
-- `godot_demo/`: minimal single-instance smoke test.
-- `example/`: creature-oriented multi-instance runtime example.
+- `-DMUJOCO_VERSION=3.4.0` — MuJoCo release to fetch.
+- `-DGODOT_CPP_TAG=godot-4.5-stable` — godot-cpp tag to build against.
+- `-DGMJ_ADDON_BIN=/path/to/bin` — where to stage the built binaries.
 
-### 1) Build the bridge
+## Run
+
+Visual demo (a MuJoCo-simulated pendulum driven every physics tick):
 
 ```bash
-cmake -S . -B build
-cmake --build build --config Release
+godot --path demo
 ```
 
-### 2) Open the creature example
-
-- Open `example/` as a project in Godot 4 .NET.
-- The scene `res://Main.tscn` uses `res://scripts/MjCreatureManager.cs`.
-- It creates multiple creature runtimes, drives actuator actions, steps MuJoCo per physics tick, and maps each creature root body position to a Godot node.
-
-### 3) Make sure dynamic dependencies are available
-
-- The bridge library itself is copied to `example/bin/` and `godot_demo/bin/` by CMake.
-- MuJoCo runtime libraries must also be resolvable by the OS loader (for example `DYLD_LIBRARY_PATH` on macOS, `LD_LIBRARY_PATH` on Linux, `PATH` on Windows).
-
-### Bundled MuJoCo runtime (development packaging)
-
-- If `MUJOCO_LIBRARY` is configured in CMake, post-build steps also copy MuJoCo runtime libs into project `bin/` folders.
-- macOS layout is copied as `bin/mujoco.framework/Versions/A/libmujoco.*.dylib` so the default `@rpath/mujoco.framework/...` dependency resolves from `@loader_path`.
-- Linux copies the resolved MuJoCo `.so` next to the bridge in `bin/`.
-- This allows running on another machine without a separate MuJoCo install, as long as the bundled runtime files are shipped with the game build.
-
-Verify bundle completeness:
+Headless end-to-end proof (loads the model, steps the sim, prints joint state,
+sensors and body pose, exits non-zero on failure — suitable for CI):
 
 ```bash
-python3 scripts/check_runtime_bundle.py
+godot --headless --path demo res://HeadlessTest.tscn
 ```
 
-## Godot Demo Files
+## Using `MjWorld` from GDScript
 
-- Native API mapping: `godot_demo/scripts/MujocoNative.cs`
-- Reusable runtime wrapper: `godot_demo/scripts/MjSceneRuntime.cs`
-- Runtime node integration: `godot_demo/scripts/MujocoDemo.cs`
-- Demo scene: `godot_demo/Main.tscn`
-- Sample MJCF: `godot_demo/models/pendulum.xml`
+```gdscript
+var world := MjWorld.new()
+add_child(world)
+world.load_model("res://models/pendulum.xml")
 
-## Creature Example Files
+var motor := world.actuator_id("hinge_motor")
+world.set_ctrl(motor, 0.15)
+world.step(10)                                  # advance 10 MuJoCo steps
 
-- Native API mapping: `example/scripts/MujocoNative.cs`
-- Runtime wrapper: `example/scripts/MjSceneRuntime.cs`
-- Creature runtime class: `example/scripts/MjCreatureRuntime.cs`
-- Trainer bridge (step/obs/reward/done/reset): `example/scripts/MjCreatureTrainerBridge.cs`
-- Creature manager node: `example/scripts/MjCreatureManager.cs`
-- Example scene: `example/Main.tscn`
-- Example MJCF: `example/models/pendulum.xml`
-
-## Training Loop Pattern in `example/`
-
-- `MjCreatureTrainerBridge` owns all creature runtimes and exposes trainer-friendly methods:
-  - action write: `SetAction(creature, action, value)`
-  - stepping: `StepCreature(creature, stepsPerTick)`
-  - observation fetch: `FillObservation(creature, buffer)`
-  - reward signal: `ComputeRewardForwardX(creature)`
-  - termination/reset: `IsTerminated(creature, minHeight)`, `ResetCreature(creature)`
-- `MjCreatureManager` shows how to run this each Godot physics tick and keep visual nodes synchronized.
-
-## Hot-Reloaded Export Workflow
-
-- Set `PolicyExportDir` in `example/scripts/MjCreatureManager.cs` (default: `res://policy_exports`).
-- The manager polls that directory and hot-reloads updated files:
-  - `vecnorm_stats.json`
-  - `policy_linear.json` (fallback policy backend for quick testing)
-  - `policy.onnx` (primary backend via ONNX Runtime)
-- Use atomic file updates from your trainer process:
-  1. write `*.tmp`
-  2. rename to final filename.
-
-Starter samples are provided in `example/policy_exports/`:
-
-- `vecnorm_stats.sample.json`
-- `policy_linear.sample.json`
-
-Copy them to `vecnorm_stats.json` and `policy_linear.json` to test live reloading quickly.
-
-Editor selection options in `MjCreatureManager`:
-
-- `UseLatestPolicyFiles=true`: load newest matching files from folder (good for checkpoints).
-- `OnnxSelector`, `VecNormSelector`, `LinearSelector`: glob patterns (default `*.onnx`, `*vecnorm*.json`, `policy_linear*.json`).
-- `UseLatestPolicyFiles=false`: selectors are treated as exact filenames in `PolicyExportDir`.
-
-### ONNX backend notes
-
-- `example/GodotMujocoExample.csproj` includes `Microsoft.ML.OnnxRuntime`.
-- `example/scripts/OnnxPolicy.cs` loads `policy.onnx` and performs inference each tick.
-- If both `policy.onnx` and `policy_linear.json` are present, ONNX is used first.
-- For non-desktop targets, ship platform-specific ONNX Runtime native binaries with the exported app.
-
-## 1000-Object Physics Benchmark
-
-Benchmark scene: `example/PhysicsBenchmark.tscn`
-
-What it does:
-
-- Runs sphere-count scenarios: `100`, `1000`, `10000`.
-- For each scenario, runs uncapped Godot physics and uncapped MuJoCo stepping.
-- Uses `dt = 1/60` and reports steps/sec per engine.
-
-Run headless:
-
-```bash
-"/Applications/Godot_mono.app/Contents/MacOS/Godot" --headless --path "/Users/shnidi/claude/robots/godot-mujoco/example" --scene "res://PhysicsBenchmark.tscn"
+var body := world.body_id("pendulum")
+print(world.body_world_transform(body))         # full pose (Transform3D)
+print(world.get_qpos())                         # PackedFloat64Array
+print(world.get_sensordata())                   # all sensor readings
 ```
 
-### Benchmark Report (Current)
+Or with **zero code**: add an `MjWorld` node, set its `model_path` and enable
+`auto_step` in the inspector.
 
-![Benchmark Chart](docs/benchmark_chart_v2.svg)
+### `MjWorld` API
 
-Scene coverage:
+- Lifecycle: `load_model(path)`, `free_model()`, `is_ready()`, `reset()`,
+  `step(n=1)`, `forward()`
+- Dimensions: `get_nq()`, `get_nv()`, `get_nu()`, `get_nbody()`, `get_njnt()`,
+  `get_nsensor()`
+- Clock: `get_time()`, `get_timestep()`, `set_timestep(dt)`
+- Lookup: `body_id/joint_id/actuator_id/sensor_id(name)` and the matching
+  `*_name(id)` accessors
+- State: `get_ctrl(i)/set_ctrl(i,v)`, `get_qpos()/set_qpos()`,
+  `get_qvel()/set_qvel()`, `get_ctrl_array()/set_ctrl_array()`
+- Sensors: `get_sensordata()`, `get_sensor(sensor_index)`
+- Kinematics: `body_world_position(i)` → `Vector3`,
+  `body_world_quaternion(i)` → `Quaternion`, `body_world_transform(i)` →
+  `Transform3D`
+- Diagnostics: `get_mujoco_version()`, `get_last_error()`
+- Properties: `model_path`, `steps_per_tick`, `auto_step`
 
-- Godot scene workloads: `100`, `1000`, `10000` `RigidBody3D` spheres + static floor in `example/scripts/PhysicsBenchmark.cs`.
-- MuJoCo scene workloads: generated free-body sphere models for `100`, `1000`, `10000` + plane floor (`user://mujoco_benchmark_*.xml`) from the same benchmark script.
+> MuJoCo is Z-up; Godot is Y-up. Kinematics queries return raw MuJoCo world-frame
+> values — remap axes in your scene as needed. `mj_step` evaluates sensors before
+> integrating, so call `forward()` if you need sensor/derived data consistent
+> with the post-step state.
 
-Axes in chart:
+## Using from C#
 
-- X-axis: steps per second
-- Y-axis: sphere-count/engine pairs
+The extension registers `MjWorld` engine-wide, so it is equally available to C#
+(`Godot.NET`) projects — construct `new MjWorld()`, add it to the tree, and call
+the same methods. No P/Invoke and no separate bridge assembly.
 
-Test config:
+## Project layout
 
-- Objects: `100`, `1000`, `10000`
-- Fixed timestep: `1/60`
-- Duration: `8s` per measured scenario
-- Runner: headless Godot .NET (`4.6.stable.mono`)
+```
+CMakeLists.txt                     # fetches MuJoCo + godot-cpp, builds + bundles
+src/                               # C++ GDExtension (MjWorld, registration)
+demo/                              # standard Godot project (GDScript)
+  addons/godot_mujoco/*.gdextension
+  Main.tscn / HeadlessTest.tscn
+  models/pendulum.xml
+scripts/cloud_setup.sh             # idempotent CI / Cloud-Agent bring-up
+```
 
-Measured result (latest run):
+## Mobile (iOS / Android)
 
-- `100 spheres` -> Godot: `1160.72`, MuJoCo: `7608.90`, ratio: `6.56x`
-- `1000 spheres` -> Godot: `571.64`, MuJoCo: `699.31`, ratio: `1.22x`
-- `10000 spheres` -> Godot: `36.12`, MuJoCo: `6.98`, ratio: `0.19x`
-
-Interpretation:
-
-- This benchmark is useful as a quick relative throughput check under one specific setup.
-- Treat values as machine/config dependent; rerun on target hardware for deployment decisions.
-
-## Creature Training Direction
-
-- Use one `MjSceneRuntime` per creature instance to isolate simulation state.
-- Resolve body/joint/actuator IDs once at startup, then use batch slice APIs each tick.
-- For high step rates, run multiple internal steps per Godot physics frame and only sync required state back to scene nodes.
-
-If MuJoCo headers are not found during compile, the bridge still builds but returns `GMJ_ERR_MUJOCO` at runtime.
+Not included yet. MuJoCo ships **no official mobile prebuilts**, so mobile
+requires cross-compiling the MuJoCo simulation core from source (Android NDK;
+iOS toolchain) and linking it into a per-ABI GDExtension build (Android `.so`
+per ABI; iOS static library / XCFramework). The simulation core has no
+GPU/OpenGL dependency, so this is feasible as a follow-up.
 
 ## Roadmap
 
-- Full multi-phase plan: `docs/full_plan.md`
+- Multi-phase plan: `docs/full_plan.md`

@@ -3,7 +3,9 @@
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/quaternion.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
 // Forward declarations keep MuJoCo headers out of this file; the real types are
@@ -47,14 +49,23 @@ public:
 	int get_nv() const;
 	int get_nu() const;
 	int get_nbody() const;
+	int get_njnt() const;
+	int get_nsensor() const;
+
+	// Simulation clock.
+	double get_time() const;
+	double get_timestep() const;
+	void set_timestep(double dt);
 
 	// Name / id lookup.
 	int body_id(const String &name) const;
 	int joint_id(const String &name) const;
 	int actuator_id(const String &name) const;
+	int sensor_id(const String &name) const;
 	String body_name(int id) const;
 	String joint_name(int id) const;
 	String actuator_name(int id) const;
+	String sensor_name(int id) const;
 
 	// Scalar control access.
 	void set_ctrl(int index, double value);
@@ -68,8 +79,14 @@ public:
 	PackedFloat64Array get_ctrl_array() const;
 	void set_ctrl_array(const PackedFloat64Array &values);
 
-	// Kinematics query.
+	// Sensor readout.
+	PackedFloat64Array get_sensordata() const;
+	PackedFloat64Array get_sensor(int sensor_index) const;
+
+	// Kinematics queries (raw MuJoCo world frame; MuJoCo is Z-up).
 	Vector3 body_world_position(int body_index) const;
+	Quaternion body_world_quaternion(int body_index) const;
+	Transform3D body_world_transform(int body_index) const;
 
 	// Diagnostics.
 	String get_mujoco_version() const;

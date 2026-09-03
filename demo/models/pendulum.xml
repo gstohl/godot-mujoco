@@ -9,4 +9,8 @@
   <actuator>
     <motor name="hinge_motor" joint="hinge" gear="50"/>
   </actuator>
+  <sensor>
+    <jointpos name="hinge_pos" joint="hinge"/>
+    <jointvel name="hinge_vel" joint="hinge"/>
+  </sensor>
 </mujoco>
