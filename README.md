@@ -2,6 +2,11 @@
 
 Minimal C bridge exposing MuJoCo runtime calls for Godot integration.
 
+> **Bridge-free alternative:** a full in-engine MuJoCo integration as a native
+> GDExtension (no bridge, no manual MuJoCo install, standard Godot build, usable
+> from GDScript and C#) lives in [`gdextension/`](gdextension/README.md). It is
+> desktop-scoped today; see its README for details and the mobile follow-up.
+
 ## What is included
 
 - Opaque handles for `mjModel` and `mjData` (`gmj_model`, `gmj_data`)

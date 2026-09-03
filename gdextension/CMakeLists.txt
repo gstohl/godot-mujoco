@@ -90,7 +90,10 @@ set_target_properties(godot_mujoco PROPERTIES
     CXX_EXTENSIONS OFF
     POSITION_INDEPENDENT_CODE ON
     PREFIX "lib"
-    OUTPUT_NAME "godot_mujoco${GODOTCPP_SUFFIX}")
+    OUTPUT_NAME "godot_mujoco${GODOTCPP_SUFFIX}"
+    # Stage with only the relocatable RPATH ($ORIGIN/@loader_path), never the
+    # absolute build path, so the bundled runtime is fully portable.
+    BUILD_WITH_INSTALL_RPATH TRUE)
 
 # Resolve the bundled MuJoCo runtime next to the extension so no LD_LIBRARY_PATH
 # / DYLD_LIBRARY_PATH / PATH tweaks are ever required.
