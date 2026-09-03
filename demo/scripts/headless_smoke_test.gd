@@ -53,6 +53,12 @@ func _ready() -> void:
 	print("start_angle=%.4f  end_angle=%.4f  moved=%s  sensordata=%s  sensor_matches_qpos=%s" % [
 		start_angle, end_angle, str(moved), str(sensordata), str(sensor_matches_qpos)])
 
+	# Debug snapshot: contacts, energy and warnings.
+	print("debug: ncon=%d  KE=%.4f  PE=%.4f  warnings=%s" % [
+		world.get_ncon(), world.get_kinetic_energy(),
+		world.get_potential_energy(), str(world.get_warnings())])
+	print("debug_info=%s" % str(world.get_debug_info()))
+
 	var passed: bool = moved and body_id >= 0 and world.get_nq() == 1 and world.get_nu() == 1 \
 		and world.get_nsensor() == 2 and world.get_njnt() == 1 and sensor_matches_qpos
 	if passed:

@@ -30,6 +30,10 @@ func _ready() -> void:
 	b.forward()
 	print("initial shoulder perturbation = %.5f rad" % eps)
 
+	var e0: float = a.get_kinetic_energy() + a.get_potential_energy()
+	print("initial energy: KE=%.4f  PE=%.4f  total=%.4f J" % [
+		a.get_kinetic_energy(), a.get_potential_energy(), e0])
+
 	var dt := a.get_timestep()
 	var diverged_time := -1.0
 	var max_div := 0.0
@@ -49,6 +53,11 @@ func _ready() -> void:
 
 	print("max |Δshoulder| over 6s = %.4f rad; first exceeded 0.5 rad at t=%.2fs" % [
 		max_div, diverged_time])
+
+	# Debug: a passive system should approximately conserve energy.
+	var e1: float = a.get_kinetic_energy() + a.get_potential_energy()
+	print("debug: final energy total=%.4f J (drift %.2f%%), ncon=%d, warnings=%s" % [
+		e1, 100.0 * (e1 - e0) / e0 if e0 != 0.0 else 0.0, a.get_ncon(), str(a.get_warnings())])
 
 	# A 1e-5 rad perturbation growing past 0.5 rad is the chaotic signature.
 	var passed: bool = a.get_nq() == 2 and a.get_nbody() == 3 \

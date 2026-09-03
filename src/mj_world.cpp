@@ -57,6 +57,10 @@ bool MjWorld::load_model(const String &xml_path) {
 		return false;
 	}
 
+	// Enable energy computation so get_kinetic_energy()/get_potential_energy()
+	// and the debug snapshot report meaningful values.
+	model->opt.enableflags |= mjENBL_ENERGY;
+
 	last_error = "";
 	return true;
 }
@@ -330,6 +334,79 @@ String MjWorld::get_last_error() const {
 	return last_error;
 }
 
+int MjWorld::get_ncon() const {
+	return is_ready() ? data->ncon : -1;
+}
+
+double MjWorld::get_potential_energy() const {
+	return is_ready() ? (double)data->energy[0] : 0.0;
+}
+
+double MjWorld::get_kinetic_energy() const {
+	return is_ready() ? (double)data->energy[1] : 0.0;
+}
+
+Dictionary MjWorld::get_warnings() const {
+	static const char *kWarningNames[mjNWARNING] = {
+		"INERTIA", "CONTACTFULL", "CNSTRFULL",
+		"BADQPOS", "BADQVEL", "BADQACC", "BADCTRL"
+	};
+	Dictionary out;
+	if (!is_ready()) {
+		return out;
+	}
+	for (int i = 0; i < mjNWARNING; ++i) {
+		const int count = data->warning[i].number;
+		if (count > 0) {
+			out[String(kWarningNames[i])] = count;
+		}
+	}
+	return out;
+}
+
+bool MjWorld::has_warnings() const {
+	if (!is_ready()) {
+		return false;
+	}
+	for (int i = 0; i < mjNWARNING; ++i) {
+		if (data->warning[i].number > 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+Dictionary MjWorld::get_debug_info() const {
+	Dictionary info;
+	info["mujoco_version"] = get_mujoco_version();
+	info["ready"] = is_ready();
+	info["last_error"] = last_error;
+	if (!is_ready()) {
+		return info;
+	}
+
+	info["time"] = get_time();
+	info["timestep"] = get_timestep();
+	info["nq"] = model->nq;
+	info["nv"] = model->nv;
+	info["nu"] = model->nu;
+	info["nbody"] = model->nbody;
+	info["njnt"] = model->njnt;
+	info["nsensor"] = model->nsensor;
+	info["ncon"] = data->ncon;
+
+	Dictionary energy;
+	const double potential = (double)data->energy[0];
+	const double kinetic = (double)data->energy[1];
+	energy["potential"] = potential;
+	energy["kinetic"] = kinetic;
+	energy["total"] = potential + kinetic;
+	info["energy"] = energy;
+
+	info["warnings"] = get_warnings();
+	return info;
+}
+
 void MjWorld::set_model_path(const String &p_path) {
 	model_path = p_path;
 }
@@ -420,6 +497,13 @@ void MjWorld::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_mujoco_version"), &MjWorld::get_mujoco_version);
 	ClassDB::bind_method(D_METHOD("get_last_error"), &MjWorld::get_last_error);
+
+	ClassDB::bind_method(D_METHOD("get_ncon"), &MjWorld::get_ncon);
+	ClassDB::bind_method(D_METHOD("get_kinetic_energy"), &MjWorld::get_kinetic_energy);
+	ClassDB::bind_method(D_METHOD("get_potential_energy"), &MjWorld::get_potential_energy);
+	ClassDB::bind_method(D_METHOD("get_warnings"), &MjWorld::get_warnings);
+	ClassDB::bind_method(D_METHOD("has_warnings"), &MjWorld::has_warnings);
+	ClassDB::bind_method(D_METHOD("get_debug_info"), &MjWorld::get_debug_info);
 
 	ClassDB::bind_method(D_METHOD("set_model_path", "path"), &MjWorld::set_model_path);
 	ClassDB::bind_method(D_METHOD("get_model_path"), &MjWorld::get_model_path);

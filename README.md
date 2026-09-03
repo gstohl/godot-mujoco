@@ -11,6 +11,11 @@ native `MjWorld` node usable from **GDScript and C#**.
 > Scope: **desktop** (Linux / Windows / macOS). Mobile (iOS/Android) is a
 > documented follow-up — see [Mobile](#mobile-ios--android).
 
+![Chaotic double pendulum simulated by MuJoCo inside Godot](docs/chaos_double_pendulum.gif)
+
+*A chaotic double pendulum: MuJoCo integrates the dynamics entirely in-engine and
+the joint state drives Godot nodes. See [`ChaosPendulum.tscn`](demo/ChaosPendulum.tscn).*
+
 ## Highlights
 
 - One native node, `MjWorld`, owns a full MuJoCo `mjModel` + `mjData`.
@@ -65,6 +70,8 @@ Visual demo (a MuJoCo-simulated pendulum driven every physics tick):
 godot --path demo
 ```
 
+![MuJoCo pendulum in Godot](docs/pendulum.gif)
+
 Headless end-to-end proof (loads the model, steps the sim, prints joint state,
 sensors and body pose, exits non-zero on failure — suitable for CI):
 
@@ -117,12 +124,35 @@ Or with **zero code**: add an `MjWorld` node, set its `model_path` and enable
   `body_world_quaternion(i)` → `Quaternion`, `body_world_transform(i)` →
   `Transform3D`
 - Diagnostics: `get_mujoco_version()`, `get_last_error()`
+- Debug: `get_ncon()` (active contacts), `get_kinetic_energy()`,
+  `get_potential_energy()`, `get_warnings()`, `has_warnings()`,
+  `get_debug_info()` (aggregate `Dictionary` snapshot)
 - Properties: `model_path`, `steps_per_tick`, `auto_step`
 
 > MuJoCo is Z-up; Godot is Y-up. Kinematics queries return raw MuJoCo world-frame
 > values — remap axes in your scene as needed. `mj_step` evaluates sensors before
 > integrating, so call `forward()` if you need sensor/derived data consistent
 > with the post-step state.
+
+### Debugging
+
+`get_debug_info()` returns a snapshot you can log each frame:
+
+```gdscript
+print(world.get_debug_info())
+# { "mujoco_version": "3.12.0", "time": 1.5, "timestep": 0.01,
+#   "nq": 1, "nv": 1, "nu": 1, "nbody": 2, "njnt": 1, "nsensor": 2,
+#   "ncon": 0, "energy": { "potential": 24.3, "kinetic": 902.5, "total": 926.8 },
+#   "warnings": {  } }
+
+if world.has_warnings():
+	push_warning("MuJoCo warnings: %s" % world.get_warnings())
+```
+
+Energy is a handy correctness signal — a passive system should approximately
+conserve `get_kinetic_energy() + get_potential_energy()`. `get_warnings()`
+surfaces MuJoCo's solver warnings (e.g. `BADQACC`, `CONTACTFULL`) by name, and
+`get_ncon()` reports the number of active contacts.
 
 ## Using from C#
 
@@ -141,6 +171,39 @@ demo/                              # standard Godot project (GDScript)
   models/pendulum.xml
 scripts/cloud_setup.sh             # idempotent CI / Cloud-Agent bring-up
 ```
+
+## MuJoCo feature coverage
+
+This binding exposes a **complete runtime-control surface** — enough to load
+models, step the simulation, read/write full state, query poses and sensors, and
+debug — but it does **not** wrap all of MuJoCo's very large C API. The native
+`libmujoco` runtime is fully present; only the Godot-facing wrappers are curated.
+
+**Implemented**
+
+- Model/data lifecycle, `step`, `forward`, `reset`, multi-instance isolation
+- Dimensions + name↔id lookup (bodies, joints, actuators, sensors)
+- Full state I/O: `qpos`, `qvel`, `ctrl` (scalar + batch)
+- Kinematics: body position, orientation, full `Transform3D`
+- Sensors: all sensor data + per-sensor slices
+- Clock: time / timestep
+- Debug: contacts, energy, solver warnings, aggregate snapshot
+
+**Not yet wrapped** (native calls exist in `libmujoco`; wrappers can be added on
+demand)
+
+- External forces / applied torques (`xfrc_applied`, `qfrc_applied`), actuator
+  force introspection
+- Contact details (points, normals, forces) beyond the active count
+- Jacobians and inverse dynamics (`mj_jac*`, `mj_inverse`)
+- Rich model introspection (geoms, sites, cameras, masses, joint ranges, gears)
+- State save/restore (`mj_getState` / `mj_setState`), keyframes, mocap bodies
+- Ray casting / collision queries (`mj_ray`), option/flag configuration
+- Model editing (`mjSpec`), plugins, deformables/flex
+- On-screen MuJoCo rendering (`mjr_*`) — intentionally omitted; Godot renders
+
+Adding a wrapper is typically a few lines in `src/mj_world.cpp` plus a
+`ClassDB::bind_method` entry. Open an issue for the calls you need.
 
 ## Mobile (iOS / Android)
 

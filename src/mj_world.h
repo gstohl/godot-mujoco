@@ -2,6 +2,7 @@
 #define GODOT_MUJOCO_MJ_WORLD_H
 
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/quaternion.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -91,6 +92,14 @@ public:
 	// Diagnostics.
 	String get_mujoco_version() const;
 	String get_last_error() const;
+
+	// Debugging: live solver / physics introspection.
+	int get_ncon() const; // number of active contacts
+	double get_kinetic_energy() const;
+	double get_potential_energy() const;
+	Dictionary get_warnings() const; // { warning_name: count } for non-zero warnings
+	bool has_warnings() const;
+	Dictionary get_debug_info() const; // aggregate snapshot for logging/inspection
 
 	// Inspector-exposed properties.
 	void set_model_path(const String &p_path);
