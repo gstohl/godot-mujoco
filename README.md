@@ -16,6 +16,11 @@ native `MjWorld` node usable from **GDScript and C#**.
 *A chaotic double pendulum: MuJoCo integrates the dynamics entirely in-engine and
 the joint state drives Godot nodes. See [`ChaosPendulum.tscn`](demo/ChaosPendulum.tscn).*
 
+![Visual debug overlay: contact points, force arrows, body frames and center of mass](docs/visual_debug.gif)
+
+*Built-in visual debug (`MjDebugDraw`): contact points, contact-force arrows, body
+frames, joint axes and center of mass. See [`VisualDebug.tscn`](demo/VisualDebug.tscn).*
+
 ## Highlights
 
 - One native node, `MjWorld`, owns a full MuJoCo `mjModel` + `mjData`.
@@ -170,8 +175,6 @@ add_child(dbg)
 dbg.world = world              # point it at your MjWorld
 dbg.show_contact_forces = true # toggles: frames / joints / com / contacts / forces
 ```
-
-![Visual debug overlay: contact points, force arrows, body frames and COM](docs/visual_debug.gif)
 
 The underlying geometry is also exposed directly: `get_contacts()` (each with
 `pos`, world-space `normal`, `force`, and penetration `distance`),
