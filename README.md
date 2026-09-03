@@ -1,11 +1,54 @@
 # godot-mujoco
 
-Minimal C bridge exposing MuJoCo runtime calls for Godot integration.
+MuJoCo physics for Godot 4, available in two flavors:
 
-> **Bridge-free alternative:** a full in-engine MuJoCo integration as a native
-> GDExtension (no bridge, no manual MuJoCo install, standard Godot build, usable
-> from GDScript and C#) lives in [`gdextension/`](gdextension/README.md). It is
-> desktop-scoped today; see its README for details and the mobile follow-up.
+1. **GDExtension (recommended)** — full **in-engine** MuJoCo as a native
+   GDExtension. No bridge, **no manual MuJoCo install**, standard Godot build
+   (no .NET required), usable from **GDScript and C#**. Desktop today
+   (Linux/macOS/Windows); mobile is a documented follow-up. Lives in
+   [`gdextension/`](gdextension/README.md).
+2. **C bridge (original)** — a minimal C shared library exposing MuJoCo calls,
+   consumed from Godot .NET via P/Invoke. Documented in the second half of this
+   file.
+
+## Which should I use?
+
+| | GDExtension (`gdextension/`) | C bridge (repo root) |
+| --- | --- | --- |
+| Integration | MuJoCo runs in-engine as native nodes | thin C lib called via C# P/Invoke |
+| Interop cost | native `mj_step`, zero managed boundary | managed ↔ native per call (batched) |
+| Godot build | standard (no .NET required) | Godot .NET / Mono |
+| MuJoCo runtime | auto-fetched + bundled by the build | separate install / manual bundling |
+| Usable from | GDScript **and** C# | C# |
+| Manual steps | none | set loader paths / copy libs |
+
+New to the project? Start with the [GDExtension](gdextension/README.md).
+
+## Quick start — GDExtension (recommended)
+
+```bash
+cmake -S gdextension -B gdextension/build
+cmake --build gdextension/build -j
+godot --path gdextension/demo                                     # visual pendulum demo
+godot --headless --path gdextension/demo res://HeadlessTest.tscn  # end-to-end proof
+```
+
+The build auto-downloads the pinned MuJoCo release and godot-cpp, then bundles the
+MuJoCo runtime next to the extension (resolved via `$ORIGIN` / `@loader_path`), so
+**no** `LD_LIBRARY_PATH` / `DYLD_LIBRARY_PATH` / `PATH` changes are needed. Add an
+`MjWorld` node, set `model_path`, and call `step()` — or enable `auto_step` for
+zero-code simulation. Full API and details in
+[`gdextension/README.md`](gdextension/README.md).
+
+> On distros whose default `cc`/`c++` points at Clang and can't find `libstdc++`,
+> configure with `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
+
+---
+
+# C bridge (original approach)
+
+The remainder of this document covers the original C bridge: a minimal C shared
+library exposing MuJoCo runtime calls, consumed from Godot .NET via P/Invoke.
 
 ## What is included
 
