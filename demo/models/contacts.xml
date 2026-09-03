@@ -1,0 +1,25 @@
+<mujoco model="contacts_debug">
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <default>
+    <geom density="400"/>
+  </default>
+  <worldbody>
+    <geom name="floor" type="plane" size="3 3 0.1" friction="1 0.1 0.1"/>
+    <body name="ball0" pos="-0.60 0.0 0.9">
+      <freejoint/>
+      <geom type="sphere" size="0.15" friction="1 0.1 0.1"/>
+    </body>
+    <body name="ball1" pos="-0.20 0.0 1.3">
+      <freejoint/>
+      <geom type="sphere" size="0.15" friction="1 0.1 0.1"/>
+    </body>
+    <body name="ball2" pos="0.20 0.0 1.0">
+      <freejoint/>
+      <geom type="sphere" size="0.15" friction="1 0.1 0.1"/>
+    </body>
+    <body name="ball3" pos="0.60 0.0 1.4">
+      <freejoint/>
+      <geom type="sphere" size="0.15" friction="1 0.1 0.1"/>
+    </body>
+  </worldbody>
+</mujoco>

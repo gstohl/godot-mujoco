@@ -26,6 +26,8 @@ the joint state drives Godot nodes. See [`ChaosPendulum.tscn`](demo/ChaosPendulu
   via the `auto_step` property.
 - Batch state I/O, full body pose (position + orientation), sensors, and clock
   access for low-overhead per-tick integration.
+- Built-in **visual debug** overlay (`MjDebugDraw`): contact points, force
+  arrows, body frames, joint axes and center of mass.
 
 ## Requirements
 
@@ -127,6 +129,8 @@ Or with **zero code**: add an `MjWorld` node, set its `model_path` and enable
 - Debug: `get_ncon()` (active contacts), `get_kinetic_energy()`,
   `get_potential_energy()`, `get_warnings()`, `has_warnings()`,
   `get_debug_info()` (aggregate `Dictionary` snapshot)
+- Visual debug: `get_contacts()`, `get_center_of_mass()`, `get_joint_anchor(i)`,
+  `get_joint_axis(i)`, plus the `MjDebugDraw` overlay node
 - Properties: `model_path`, `steps_per_tick`, `auto_step`
 
 > MuJoCo is Z-up; Godot is Y-up. Kinematics queries return raw MuJoCo world-frame
@@ -153,6 +157,27 @@ Energy is a handy correctness signal — a passive system should approximately
 conserve `get_kinetic_energy() + get_potential_energy()`. `get_warnings()`
 surfaces MuJoCo's solver warnings (e.g. `BADQACC`, `CONTACTFULL`) by name, and
 `get_ncon()` reports the number of active contacts.
+
+### Visual debug
+
+`MjDebugDraw` is a drop-in overlay node that renders MuJoCo's debug geometry —
+**contact points, contact-force arrows, body frames, joint axes and the center
+of mass** — as lines on top of your scene:
+
+```gdscript
+var dbg := MjDebugDraw.new()
+add_child(dbg)
+dbg.world = world              # point it at your MjWorld
+dbg.show_contact_forces = true # toggles: frames / joints / com / contacts / forces
+```
+
+![Visual debug overlay: contact points, force arrows, body frames and COM](docs/visual_debug.gif)
+
+The underlying geometry is also exposed directly: `get_contacts()` (each with
+`pos`, world-space `normal`, `force`, and penetration `distance`),
+`get_center_of_mass()`, `get_joint_anchor(i)` and `get_joint_axis(i)`. See
+[`VisualDebug.tscn`](demo/VisualDebug.tscn) for a runnable example — falling
+balls whose resting contact forces sum to their weight.
 
 ## Using from C#
 
@@ -187,14 +212,15 @@ debug — but it does **not** wrap all of MuJoCo's very large C API. The native
 - Kinematics: body position, orientation, full `Transform3D`
 - Sensors: all sensor data + per-sensor slices
 - Clock: time / timestep
-- Debug: contacts, energy, solver warnings, aggregate snapshot
+- Debug: energy, solver warnings, aggregate snapshot
+- Visual debug: contact points / normals / forces, center of mass, joint axes,
+  and the `MjDebugDraw` overlay
 
 **Not yet wrapped** (native calls exist in `libmujoco`; wrappers can be added on
 demand)
 
 - External forces / applied torques (`xfrc_applied`, `qfrc_applied`), actuator
   force introspection
-- Contact details (points, normals, forces) beyond the active count
 - Jacobians and inverse dynamics (`mj_jac*`, `mj_inverse`)
 - Rich model introspection (geoms, sites, cameras, masses, joint ranges, gears)
 - State save/restore (`mj_getState` / `mj_setState`), keyframes, mocap bodies

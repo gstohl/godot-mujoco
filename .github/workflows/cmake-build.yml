@@ -51,3 +51,9 @@ jobs:
           ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://ChaosPendulumTest.tscn 2>&1 \
             | tee chaos.log
           grep -q "CHAOS TEST: PASS" chaos.log
+
+      - name: Visual-debug data test (contacts / forces)
+        run: |
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://VisualDebugTest.tscn 2>&1 \
+            | tee vdebug.log
+          grep -q "VISUAL DEBUG DATA TEST: PASS" vdebug.log

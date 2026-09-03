@@ -407,6 +407,58 @@ Dictionary MjWorld::get_debug_info() const {
 	return info;
 }
 
+Array MjWorld::get_contacts() const {
+	Array out;
+	if (!is_ready()) {
+		return out;
+	}
+	for (int i = 0; i < data->ncon; ++i) {
+		const mjContact &c = data->contact[i];
+		mjtNum wrench[6] = { 0 };
+		mj_contactForce(model, data, i, wrench);
+		// c.frame is a 3x3 matrix whose rows are the contact axes in world
+		// coordinates (row 0 = normal). The contact force is expressed in that
+		// frame, so rotate it back into world space.
+		const Vector3 n((float)c.frame[0], (float)c.frame[1], (float)c.frame[2]);
+		const Vector3 t1((float)c.frame[3], (float)c.frame[4], (float)c.frame[5]);
+		const Vector3 t2((float)c.frame[6], (float)c.frame[7], (float)c.frame[8]);
+		const Vector3 force = n * (float)wrench[0] + t1 * (float)wrench[1] + t2 * (float)wrench[2];
+
+		Dictionary d;
+		d["pos"] = Vector3((float)c.pos[0], (float)c.pos[1], (float)c.pos[2]);
+		d["normal"] = n;
+		d["force"] = force;
+		d["distance"] = (double)c.dist;
+		out.push_back(d);
+	}
+	return out;
+}
+
+Vector3 MjWorld::get_center_of_mass() const {
+	if (!is_ready()) {
+		return Vector3();
+	}
+	// subtree_com of the world body (index 0) is the whole-model center of mass.
+	const mjtNum *com = data->subtree_com;
+	return Vector3((float)com[0], (float)com[1], (float)com[2]);
+}
+
+Vector3 MjWorld::get_joint_anchor(int joint_index) const {
+	if (!is_ready() || joint_index < 0 || joint_index >= model->njnt) {
+		return Vector3();
+	}
+	const mjtNum *a = data->xanchor + (3 * joint_index);
+	return Vector3((float)a[0], (float)a[1], (float)a[2]);
+}
+
+Vector3 MjWorld::get_joint_axis(int joint_index) const {
+	if (!is_ready() || joint_index < 0 || joint_index >= model->njnt) {
+		return Vector3();
+	}
+	const mjtNum *a = data->xaxis + (3 * joint_index);
+	return Vector3((float)a[0], (float)a[1], (float)a[2]);
+}
+
 void MjWorld::set_model_path(const String &p_path) {
 	model_path = p_path;
 }
@@ -504,6 +556,11 @@ void MjWorld::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_warnings"), &MjWorld::get_warnings);
 	ClassDB::bind_method(D_METHOD("has_warnings"), &MjWorld::has_warnings);
 	ClassDB::bind_method(D_METHOD("get_debug_info"), &MjWorld::get_debug_info);
+
+	ClassDB::bind_method(D_METHOD("get_contacts"), &MjWorld::get_contacts);
+	ClassDB::bind_method(D_METHOD("get_center_of_mass"), &MjWorld::get_center_of_mass);
+	ClassDB::bind_method(D_METHOD("get_joint_anchor", "joint_index"), &MjWorld::get_joint_anchor);
+	ClassDB::bind_method(D_METHOD("get_joint_axis", "joint_index"), &MjWorld::get_joint_axis);
 
 	ClassDB::bind_method(D_METHOD("set_model_path", "path"), &MjWorld::set_model_path);
 	ClassDB::bind_method(D_METHOD("get_model_path"), &MjWorld::get_model_path);

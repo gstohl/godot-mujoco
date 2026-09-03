@@ -2,6 +2,7 @@
 #define GODOT_MUJOCO_MJ_WORLD_H
 
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/quaternion.hpp>
@@ -100,6 +101,12 @@ public:
 	Dictionary get_warnings() const; // { warning_name: count } for non-zero warnings
 	bool has_warnings() const;
 	Dictionary get_debug_info() const; // aggregate snapshot for logging/inspection
+
+	// Visual-debug geometry (MuJoCo world frame; feed a MjDebugDraw overlay).
+	Array get_contacts() const; // [{ pos, normal, force, distance }]
+	Vector3 get_center_of_mass() const; // whole-model COM
+	Vector3 get_joint_anchor(int joint_index) const;
+	Vector3 get_joint_axis(int joint_index) const;
 
 	// Inspector-exposed properties.
 	void set_model_path(const String &p_path);
