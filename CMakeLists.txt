@@ -65,6 +65,14 @@ if(GMJ_BUILD_MUJOCO_FROM_SOURCE)
     # LTO of the whole engine is slow and brittle on NDK/Xcode; desktop prebuilts
     # already ship optimized. Keep source builds incremental and CI-friendly.
     set(MUJOCO_ENABLE_LTO OFF CACHE BOOL "" FORCE)
+    # qhull (a MuJoCo dep) otherwise builds CLI tools. On iOS those become
+    # MACOSX_BUNDLE executables and CMake errors on `install(TARGETS)` without
+    # a BUNDLE DESTINATION. We only need qhullstatic_r.
+    set(BUILD_APPLICATIONS OFF CACHE BOOL "" FORCE)
+    set(QHULL_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(CMAKE_MACOSX_BUNDLE OFF CACHE BOOL "" FORCE)
+    endif()
 
     set(_mj_mobile_patch "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/mujoco-mobile.patch")
     # posix_memalign + localtime_r: official sources assume desktop C11/POSIX.
