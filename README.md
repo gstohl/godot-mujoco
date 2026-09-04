@@ -325,7 +325,7 @@ Runtime on a device or emulator (MuJoCo core only — no Godot):
 ```bash
 adb push demo/addons/godot_mujoco/bin/gmj_core_smoke /data/local/tmp/
 adb push demo/addons/godot_mujoco/bin/libmujoco.so /data/local/tmp/
-# also push the versioned SONAME file if `readelf -d` shows libmujoco.so.X
+adb push demo/addons/godot_mujoco/bin/libc++_shared.so /data/local/tmp/
 adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=. ./gmj_core_smoke"
 # expect: CORE SMOKE: PASS
 ```

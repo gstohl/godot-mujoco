@@ -66,7 +66,9 @@ if ! readelf -d "$EXT" | grep -q 'NEEDED.*libmujoco'; then
   exit 1
 fi
 
-if ! readelf -s "$EXT" | grep -q 'godot_mujoco_library_init'; then
+# readelf -s truncates long names; -W keeps the full export.
+# Process substitution avoids `set -o pipefail` + `grep -q` SIGPIPE false fails.
+if ! grep -q 'godot_mujoco_library_init' < <(readelf -Ws "$EXT"); then
   echo "FAIL: missing GDExtension entry symbol godot_mujoco_library_init" >&2
   exit 1
 fi

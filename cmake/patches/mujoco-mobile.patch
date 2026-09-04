@@ -1,0 +1,23 @@
+--- a/src/engine/engine_util_errmem.c
++++ b/src/engine/engine_util_errmem.c
+@@ -50,6 +50,11 @@
+ static inline void* mju_alignedMalloc(size_t size, size_t align) {
+ #ifdef _WIN32
+   return _aligned_malloc(size, align);
++#elif defined(__ANDROID__)
++  // aligned_alloc is only in bionic from API 28; posix_memalign is older.
++  void* ptr = NULL;
++  if (posix_memalign(&ptr, align, size) != 0) return NULL;
++  return ptr;
+ #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+   return aligned_alloc(align, size);
+ #endif
+@@ -218,7 +223,7 @@
+   struct tm timeinfo;
+   time(&rawtime);
+ 
+-#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || defined(__STDC_VERSION_TIME_H__) || defined(__EMSCRIPTEN__)
++#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || defined(__STDC_VERSION_TIME_H__) || defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+   localtime_r(&rawtime, &timeinfo);
+ #elif defined(_WIN32)
+   localtime_s(&timeinfo, &rawtime);

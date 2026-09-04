@@ -15,4 +15,5 @@
 /demo/addons/godot_mujoco/bin/*.dll
 /demo/addons/godot_mujoco/bin/*.a
 /demo/addons/godot_mujoco/bin/gmj_core_smoke
+/demo/addons/godot_mujoco/bin/libc++_shared.so
 /demo/addons/godot_mujoco/bin/*.framework/

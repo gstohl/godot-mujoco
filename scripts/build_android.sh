@@ -43,19 +43,24 @@ download_ndk_linux() {
   local zip="$CACHE/android-ndk-${NDK_VERSION}-linux.zip"
   local url="https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
   if [[ -f "$dest/build/cmake/android.toolchain.cmake" ]]; then
-    echo "$dest"; return
+    printf '%s\n' "$dest"
+    return
   fi
   mkdir -p "$CACHE"
   if [[ ! -f "$zip" ]]; then
-    echo "Downloading Android NDK ${NDK_VERSION}..."
+    echo "Downloading Android NDK ${NDK_VERSION}..." >&2
     curl -fL --retry 3 -o "$zip.partial" "$url"
     mv "$zip.partial" "$zip"
   fi
-  echo "${NDK_SHA1_LINUX}  ${zip}" | sha1sum -c -
+  echo "${NDK_SHA1_LINUX}  ${zip}" | sha1sum -c - >&2
   rm -rf "$dest"
   unzip -q "$zip" -d "$CACHE"
   # Archive extracts to android-ndk-<ver>/
-  echo "$dest"
+  if [[ ! -f "$dest/build/cmake/android.toolchain.cmake" ]]; then
+    echo "NDK extract missing toolchain at $dest" >&2
+    exit 1
+  fi
+  printf '%s\n' "$dest"
 }
 
 NDK="$(find_ndk)"

@@ -66,11 +66,18 @@ if(GMJ_BUILD_MUJOCO_FROM_SOURCE)
     # already ship optimized. Keep source builds incremental and CI-friendly.
     set(MUJOCO_ENABLE_LTO OFF CACHE BOOL "" FORCE)
 
+    set(_mj_mobile_patch "${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/mujoco-mobile.patch")
+    # posix_memalign + localtime_r: official sources assume desktop C11/POSIX.
+    # apply_patch.cmake treats "already applied" as success so reconfigure is idempotent.
+    set(_mj_patch_cmd ${CMAKE_COMMAND} -D PATCH_FILE=${_mj_mobile_patch}
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/apply_patch.cmake")
     if(DEFINED _mj_src_hash)
         FetchContent_Declare(mujoco_src URL "${_mj_src_url}" URL_HASH "${_mj_src_hash}"
-            DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            PATCH_COMMAND ${_mj_patch_cmd})
     else()
-        FetchContent_Declare(mujoco_src URL "${_mj_src_url}" DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+        FetchContent_Declare(mujoco_src URL "${_mj_src_url}" DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+            PATCH_COMMAND ${_mj_patch_cmd})
     endif()
     FetchContent_MakeAvailable(mujoco_src)
 
@@ -228,6 +235,21 @@ if(GMJ_MUJOCO_FROM_SOURCE_TARGET)
             COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:gmj_core_smoke>"
                 "${GMJ_ADDON_BIN}/"
             COMMENT "Staging gmj_core_smoke")
+    endif()
+    if(ANDROID AND DEFINED CMAKE_ANDROID_NDK)
+        # Needed by adb-run of gmj_core_smoke; Godot's Android export also ships it.
+        set(_gmj_libcxx "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+        if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+            set(_gmj_libcxx "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+            if(NOT EXISTS "${_gmj_libcxx}")
+                set(_gmj_libcxx "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/darwin-aarch64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so")
+            endif()
+        endif()
+        if(EXISTS "${_gmj_libcxx}")
+            add_custom_command(TARGET godot_mujoco POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy "${_gmj_libcxx}" "${GMJ_ADDON_BIN}/libc++_shared.so"
+                COMMENT "Bundling NDK libc++_shared.so")
+        endif()
     endif()
 else()
     file(GLOB MUJOCO_RUNTIME_FILES
