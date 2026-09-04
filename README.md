@@ -263,15 +263,18 @@ Adding a wrapper is typically a few lines in `src/mj_world.cpp` plus a
 
 ## Loading models in exported games
 
-`load_model()` reads the file through Godot's filesystem (`FileAccess`) and hands
-the bytes to MuJoCo via its in-memory VFS, so `res://` models work in an
-**exported** game, not just the editor. Two caveats:
+`load_model()` reads through Godot's filesystem (`FileAccess`) and hands the
+bytes to MuJoCo via its in-memory VFS, so `res://` models work in an **exported**
+game, not just the editor. It also scans the model's directory and adds sibling
+files to the VFS, so **multi-file MJCF** — `<include>` files and mesh/texture
+assets (e.g. `meshdir`) — resolves too. See
+[`demo/models/composite/`](demo/models/composite) for an `<include>` + mesh
+example.
 
-- Add your `.xml`/`.mjcf` (and any referenced meshes) to the export's
-  non-resource filter so they're packed, or load from a string with
-  `load_model_from_string(xml_text)`.
-- Self-contained MJCF works out of the box; MJCF `<include>`/mesh assets that
-  reference other files are not yet added to the VFS.
+- For an exported game, add your `.xml`/`.mjcf` **and referenced assets** (meshes,
+  textures, included files) to the export's non-resource filter so they're packed
+  and readable by `FileAccess`.
+- To load without any files, use `load_model_from_string(xml_text)`.
 
 ## Platforms
 
@@ -291,11 +294,27 @@ iOS toolchain) and linking it into a per-ABI GDExtension build (Android `.so`
 per ABI; iOS static library / XCFramework). The simulation core has no
 GPU/OpenGL dependency, so this is feasible as a follow-up.
 
+## Keeping dependencies up to date
+
+The three pinned versions (MuJoCo, Godot, godot-cpp) are the main thing to track.
+
+- **In-repo check**: [`.github/workflows/check-upstream-versions.yml`](.github/workflows/check-upstream-versions.yml)
+  runs weekly (and on demand) and opens/refreshes a tracking issue when a pin is
+  behind. Run it locally any time with `bash scripts/check_upstream_versions.sh`.
+- **Cursor Automation** (optional, for auto-bump PRs): Cursor has no native
+  "upstream released" trigger, so create a **Scheduled** automation at
+  [cursor.com/automations](https://cursor.com/automations) (or via the `/automate`
+  skill), scoped to this repo + `main`, with the Pull Request tool enabled, e.g.:
+  > "Run `bash scripts/check_upstream_versions.sh`. If any of MuJoCo, Godot, or
+  > godot-cpp is behind, bump the pins (see the script's instructions), rebuild,
+  > and open a PR. Do nothing if everything is current."
+  For instant reaction instead of weekly polling, add a **Webhook** trigger to
+  that automation and `POST` to it from the workflow above.
+
 ## Roadmap
 
 Focused on being a solid MuJoCo integration for Godot:
 
-- Multi-file MJCF in the VFS (includes + mesh/texture assets) for exported games.
-- macOS `.dmg` extraction wired into the build; CI coverage for Windows/arm64.
+- macOS `.dmg` extraction wired into the build (today: `-DGMJ_MUJOCO_ROOT`).
 - Optional `Node3D` base so the sim can compose with a scene-graph transform.
-- Mobile via a from-source MuJoCo cross-compile (see above).
+- Mobile via a from-source MuJoCo cross-compile (see [Mobile](#mobile-ios--android)).

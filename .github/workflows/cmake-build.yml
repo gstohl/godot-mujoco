@@ -65,3 +65,59 @@ jobs:
           ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://VisualDebugTest.tscn 2>&1 \
             | tee vdebug.log
           grep -q "VISUAL DEBUG DATA TEST: PASS" vdebug.log
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential git curl unzip
+
+      - name: Build GDExtension (arm64, auto-fetches MuJoCo + godot-cpp)
+        run: |
+          cmake -S . -B build
+          cmake --build build -j "$(nproc)"
+
+      - name: Verify bundled runtime + linkage
+        run: |
+          ls -la demo/addons/godot_mujoco/bin/
+          test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.arm64.so
+          test -f demo/addons/godot_mujoco/bin/libmujoco.so.3.12.0
+          objdump -p demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.arm64.so \
+            | tee /tmp/objdump.txt
+          grep -q 'RUNPATH .*\$ORIGIN' /tmp/objdump.txt
+          grep -q 'NEEDED .*libmujoco.so.3.12.0' /tmp/objdump.txt
+
+      - name: Headless MuJoCo smoke test (arm64)
+        run: |
+          curl -fsSL -o godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.arm64.zip
+          unzip -o godot.zip
+          ./Godot_v4.7.2-stable_linux.arm64 --headless --path demo --import || true
+          ./Godot_v4.7.2-stable_linux.arm64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
+            | tee smoke.log
+          grep -q "SMOKE TEST: PASS" smoke.log
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build GDExtension (Windows / MSVC, auto-fetches MuJoCo + godot-cpp)
+        run: |
+          cmake -S . -B build
+          cmake --build build --config Release -j
+
+      - name: Verify bundled runtime
+        run: |
+          ls -la demo/addons/godot_mujoco/bin/
+          test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.windows.template_debug.x86_64.dll
+          test -f demo/addons/godot_mujoco/bin/mujoco.dll

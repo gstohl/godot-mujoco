@@ -1,0 +1,44 @@
+name: Check upstream versions
+
+# Weekly check for new MuJoCo / Godot / godot-cpp releases. When a pinned
+# version is behind, opens (or refreshes) a tracking issue. Also runnable
+# on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compare pinned vs latest
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "GMJ_BODY_FILE=$RUNNER_TEMP/body.md" >> "$GITHUB_ENV"
+          GMJ_BODY_FILE="$RUNNER_TEMP/body.md" bash scripts/check_upstream_versions.sh
+
+      - name: Open or update tracking issue
+        if: steps.check.outputs.has_updates == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Upstream dependency updates available"
+          existing="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number' 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            echo "Refreshing existing issue #$existing"
+            gh issue edit "$existing" --body-file "$GMJ_BODY_FILE"
+          else
+            echo "Opening new tracking issue"
+            gh issue create --title "$title" --body-file "$GMJ_BODY_FILE" --label dependencies \
+              || gh issue create --title "$title" --body-file "$GMJ_BODY_FILE"
+          fi

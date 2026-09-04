@@ -1,0 +1,10 @@
+<mujoco model="composite">
+  <compiler meshdir="assets"/>
+  <asset>
+    <mesh name="box" file="box.obj"/>
+  </asset>
+  <worldbody>
+    <geom type="plane" size="2 2 0.1"/>
+    <include file="arm.xml"/>
+  </worldbody>
+</mujoco>

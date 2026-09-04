@@ -1,5 +1,6 @@
 #include "mj_world.h"
 
+#include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -27,56 +28,40 @@ void MjWorld::free_model() {
 	}
 }
 
-bool MjWorld::load_model(const String &xml_path) {
-	if (xml_path.is_empty()) {
-		last_error = "model path is empty";
-		UtilityFunctions::push_error("MjWorld: " + last_error);
-		return false;
+// Recursively add every file under `dir` to the VFS, keyed by its path relative
+// to the model's base directory, so MJCF <include> files and mesh/texture
+// assets resolve. Reads through Godot's filesystem so it works from res://.
+static void gmj_add_dir_to_vfs(mjVFS *vfs, const String &dir, const String &rel_prefix, int &added) {
+	Ref<DirAccess> da = DirAccess::open(dir);
+	if (da.is_null()) {
+		return;
 	}
-
-	// Read through Godot's filesystem rather than a raw OS path so res:// works
-	// in an exported game (packed into the PCK), not only in the editor.
-	const PackedByteArray bytes = FileAccess::get_file_as_bytes(xml_path);
-	if (bytes.is_empty()) {
-		last_error = "could not read model file: " + xml_path;
-		UtilityFunctions::push_error("MjWorld: " + last_error);
-		return false;
+	da->list_dir_begin();
+	String fn = da->get_next();
+	while (!fn.is_empty()) {
+		if (da->current_is_dir()) {
+			if (fn != "." && fn != "..") {
+				gmj_add_dir_to_vfs(vfs, dir.path_join(fn), rel_prefix + fn + String("/"), added);
+			}
+		} else if (!fn.ends_with(".import") && !fn.ends_with(".uid")) {
+			const PackedByteArray b = FileAccess::get_file_as_bytes(dir.path_join(fn));
+			if (!b.is_empty()) {
+				const CharString key = (rel_prefix + fn).utf8();
+				if (mj_addBufferVFS(vfs, key.get_data(), b.ptr(), (int)b.size()) == 0) {
+					++added;
+				}
+			}
+		}
+		fn = da->get_next();
 	}
-
-	String name = xml_path.get_file();
-	if (name.is_empty()) {
-		name = "model.xml";
-	}
-	return load_model_from_buffer(bytes, name);
+	da->list_dir_end();
 }
 
-bool MjWorld::load_model_from_string(const String &xml_text, const String &virtual_name) {
-	if (xml_text.is_empty()) {
-		last_error = "model string is empty";
-		UtilityFunctions::push_error("MjWorld: " + last_error);
-		return false;
-	}
-	const String name = virtual_name.is_empty() ? String("model.xml") : virtual_name;
-	return load_model_from_buffer(xml_text.to_utf8_buffer(), name);
-}
-
-bool MjWorld::load_model_from_buffer(const PackedByteArray &bytes, const String &vfs_name) {
-	// Load via MuJoCo's virtual file system so no real filesystem path is
-	// required (works from PCK-packed resources and in-memory strings).
-	mjVFS vfs;
-	mj_defaultVFS(&vfs);
-	const CharString name_cs = vfs_name.utf8();
-	const int add_rc = mj_addBufferVFS(&vfs, name_cs.get_data(), bytes.ptr(), (int)bytes.size());
-	if (add_rc != 0) {
-		mj_deleteVFS(&vfs);
-		last_error = "mj_addBufferVFS failed (code " + String::num_int64(add_rc) + ")";
-		UtilityFunctions::push_error("MjWorld: " + last_error);
-		return false;
-	}
-
+bool MjWorld::commit_vfs_model(mjVFS_ *vfs, const String &main_name) {
+	const CharString main_cs = main_name.utf8();
 	char error[1024] = { 0 };
-	mjModel *new_model = mj_loadXML(name_cs.get_data(), &vfs, error, sizeof(error));
-	mj_deleteVFS(&vfs);
+	mjModel *new_model = mj_loadXML(main_cs.get_data(), vfs, error, sizeof(error));
+	mj_deleteVFS(vfs);
 	if (new_model == nullptr) {
 		// Keep any currently loaded model intact (load-then-swap).
 		last_error = String::utf8(error);
@@ -103,6 +88,68 @@ bool MjWorld::load_model_from_buffer(const PackedByteArray &bytes, const String 
 	data = new_data;
 	last_error = "";
 	return true;
+}
+
+bool MjWorld::load_model(const String &xml_path) {
+	if (xml_path.is_empty()) {
+		last_error = "model path is empty";
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
+
+	// Read through Godot's filesystem rather than a raw OS path so res:// works
+	// in an exported game (packed into the PCK), not only in the editor.
+	const PackedByteArray bytes = FileAccess::get_file_as_bytes(xml_path);
+	if (bytes.is_empty()) {
+		last_error = "could not read model file: " + xml_path;
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
+
+	String main_name = xml_path.get_file();
+	if (main_name.is_empty()) {
+		main_name = "model.xml";
+	}
+
+	// Populate the VFS with sibling files from the model's directory so MJCF
+	// <include> files and mesh/texture assets resolve; then ensure the main
+	// file is present under its name (duplicate adds are ignored).
+	mjVFS vfs;
+	mj_defaultVFS(&vfs);
+	const String base_dir = xml_path.get_base_dir();
+	int added = 0;
+	if (!base_dir.is_empty()) {
+		gmj_add_dir_to_vfs(&vfs, base_dir, "", added);
+	}
+	const CharString main_cs = main_name.utf8();
+	mj_addBufferVFS(&vfs, main_cs.get_data(), bytes.ptr(), (int)bytes.size());
+
+	return commit_vfs_model(&vfs, main_name);
+}
+
+bool MjWorld::load_model_from_string(const String &xml_text, const String &virtual_name) {
+	if (xml_text.is_empty()) {
+		last_error = "model string is empty";
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
+	const String name = virtual_name.is_empty() ? String("model.xml") : virtual_name;
+	return load_model_from_buffer(xml_text.to_utf8_buffer(), name);
+}
+
+bool MjWorld::load_model_from_buffer(const PackedByteArray &bytes, const String &vfs_name) {
+	// Single-buffer load (no sibling assets), used for in-memory strings.
+	mjVFS vfs;
+	mj_defaultVFS(&vfs);
+	const CharString name_cs = vfs_name.utf8();
+	const int add_rc = mj_addBufferVFS(&vfs, name_cs.get_data(), bytes.ptr(), (int)bytes.size());
+	if (add_rc != 0) {
+		mj_deleteVFS(&vfs);
+		last_error = "mj_addBufferVFS failed (code " + String::num_int64(add_rc) + ")";
+		UtilityFunctions::push_error("MjWorld: " + last_error);
+		return false;
+	}
+	return commit_vfs_model(&vfs, vfs_name);
 }
 
 bool MjWorld::is_ready() const {

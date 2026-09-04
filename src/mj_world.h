@@ -15,6 +15,7 @@
 // pulled in only by mj_world.cpp.
 struct mjModel_;
 struct mjData_;
+struct mjVFS_;
 
 namespace godot {
 
@@ -41,6 +42,10 @@ class MjWorld : public Node {
 	// Builds a model+data from an in-memory MJCF buffer via MuJoCo's VFS and,
 	// on success, swaps it in (leaving any existing model intact on failure).
 	bool load_model_from_buffer(const PackedByteArray &bytes, const String &vfs_name);
+
+	// Compiles the model named `main_name` from a populated VFS, runs forward,
+	// and swaps it in on success. Takes ownership of `vfs` (always deleted).
+	bool commit_vfs_model(mjVFS_ *vfs, const String &main_name);
 
 protected:
 	static void _bind_methods();

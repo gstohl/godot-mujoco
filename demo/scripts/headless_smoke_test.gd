@@ -65,6 +65,12 @@ func _ready() -> void:
 	var strload_ok := w2.load_model_from_string('<mujoco><worldbody><body name="b"><freejoint/><geom type="sphere" size="0.1"/></body></worldbody></mujoco>')
 	strload_ok = strload_ok and w2.get_nbody() == 2
 
+	# Multi-file MJCF: <include> + a mesh asset in a subdirectory, resolved via VFS.
+	var w3 := MjWorld.new()
+	add_child(w3)
+	var multifile_ok := w3.load_model("res://models/composite/scene.xml") and w3.get_nbody() == 2
+	print("multifile_ok=%s (err='%s')" % [str(multifile_ok), w3.get_last_error()])
+
 	# Loud error handling: a wrong-sized set_qpos must be rejected (returns false).
 	var bad_rejected: bool = not world.set_qpos(PackedFloat64Array([1.0, 2.0, 3.0]))
 	# UTF-8-safe name round-trip.
@@ -78,7 +84,7 @@ func _ready() -> void:
 
 	var passed: bool = moved and body_id >= 0 and world.get_nq() == 1 and world.get_nu() == 1 \
 		and world.get_nsensor() == 2 and world.get_njnt() == 1 and sensor_matches_qpos \
-		and strload_ok and bad_rejected and name_roundtrip and step0_noop
+		and strload_ok and multifile_ok and bad_rejected and name_roundtrip and step0_noop
 	if passed:
 		print("SMOKE TEST: PASS")
 		get_tree().quit(0)

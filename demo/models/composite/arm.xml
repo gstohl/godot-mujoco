@@ -1,0 +1,6 @@
+<mujocoinclude>
+  <body name="arm" pos="0 0 1">
+    <freejoint/>
+    <geom type="mesh" mesh="box"/>
+  </body>
+</mujocoinclude>
