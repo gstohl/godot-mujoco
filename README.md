@@ -9,10 +9,11 @@ It targets the **standard Godot build** (no .NET/Mono requirement) and exposes a
 native `MjWorld` node usable from **GDScript** (and from C# via the engine's
 `ClassDB` — see [Using from C#](#using-from-c)).
 
-> Scope: **desktop**. Linux x86_64 is built and tested in CI; Windows is wired
-> and the release archive is checksum-pinned; macOS needs a pre-extracted MuJoCo
-> (see [Platforms](#platforms)) because its release ships as a `.dmg`.
-> Mobile (iOS/Android) is a documented follow-up — see [Mobile](#mobile-ios--android).
+> Scope: **desktop first**, with **mobile compile proof**. Linux x86_64 / arm64
+> and Windows are built in CI from official MuJoCo prebuilts. Android arm64 and
+> iOS arm64 are cross-compiled from MuJoCo **source** in CI (no official mobile
+> prebuilts exist). Device/emulator runtime is a follow-up — see
+> [Mobile](#mobile-ios--android).
 
 ![Chaotic double pendulum simulated by MuJoCo inside Godot](docs/chaos_double_pendulum.gif)
 
@@ -84,6 +85,10 @@ cmake --build build-release -j
 - `-DGMJ_MUJOCO_ROOT=/path/to/mujoco` — use a pre-extracted MuJoCo instead of
   fetching (required on macOS; also an offline / custom-version escape hatch).
 - `-DGMJ_ALLOW_UNVERIFIED=ON` — permit fetching an archive with no pinned hash.
+- `-DGMJ_BUILD_MUJOCO_FROM_SOURCE=ON` — compile MuJoCo from the pinned source
+  tarball (automatic on Android/iOS; useful to test that path on desktop).
+- `-DGMJ_BUILD_CORE_SMOKE=ON` — build the standalone `gmj_core_smoke` executable
+  (automatic on Android/iOS).
 
 ## Run
 
@@ -278,21 +283,69 @@ example.
 
 ## Platforms
 
-- **Linux x86_64** — built and tested in CI (debug + release).
-- **Linux aarch64 / Windows x86_64** — archives are checksum-pinned and the
-  build is wired, but not yet exercised in CI.
+- **Linux x86_64** — built and tested in CI (debug + release, headless smoke).
+- **Linux aarch64 / Windows x86_64** — official archives are checksum-pinned;
+  CI builds both (arm64 also runs the headless smoke).
 - **macOS** — the official release is a `.dmg` CMake can't extract; download and
   mount it, then build with `-DGMJ_MUJOCO_ROOT=/path/to/mujoco-3.12.0`. (The
   `.gdextension` currently expects a `.framework`; adjust it to the produced
   `.dylib` name if you package for macOS.)
+- **Android arm64 / iOS arm64** — from-source cross-compile, proven in CI as
+  binaries (see [Mobile](#mobile-ios--android)).
 
 ## Mobile (iOS / Android)
 
-Not included yet. MuJoCo ships **no official mobile prebuilts**, so mobile
-requires cross-compiling the MuJoCo simulation core from source (Android NDK;
-iOS toolchain) and linking it into a per-ABI GDExtension build (Android `.so`
-per ABI; iOS static library / XCFramework). The simulation core has no
-GPU/OpenGL dependency, so this is feasible as a follow-up.
+MuJoCo ships **no official mobile prebuilts**, so mobile builds compile the
+simulation core **from source** (no viewer / OpenGL / GLFW) and link it into the
+GDExtension. The `.gdextension` manifest already lists `android.*` and `ios.*`
+library + `libmujoco` dependency entries.
+
+What CI proves today (compile + linkage, not a phone/emulator run):
+
+- **Android arm64-v8a** (`ubuntu-latest` + NDK r27c): `libgodot_mujoco.android.*.arm64.so`
+  is AArch64, has an Android identification note, links **bionic** (`libc.so`,
+  not glibc `libc.so.6`), `NEEDED`s `libmujoco`, and exports
+  `godot_mujoco_library_init`. A standalone `gmj_core_smoke` executable is
+  staged next to it.
+- **iOS arm64** (`macos-latest` + Xcode): `libgodot_mujoco.ios.*` and
+  `libmujoco` are arm64 **iphoneos** binaries (not macOS).
+
+### Android (Linux or your Mac)
+
+```bash
+# Linux: the script downloads pinned NDK r27c if ANDROID_NDK is unset.
+# macOS: install the NDK via Android Studio / sdkmanager, then:
+#   export ANDROID_NDK=$HOME/Library/Android/sdk/ndk/<version>
+bash scripts/build_android.sh
+bash scripts/verify_android_binaries.sh
+```
+
+Runtime on a device or emulator (MuJoCo core only — no Godot):
+
+```bash
+adb push demo/addons/godot_mujoco/bin/gmj_core_smoke /data/local/tmp/
+adb push demo/addons/godot_mujoco/bin/libmujoco.so /data/local/tmp/
+# also push the versioned SONAME file if `readelf -d` shows libmujoco.so.X
+adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=. ./gmj_core_smoke"
+# expect: CORE SMOKE: PASS
+```
+
+A full Godot Android **export** still needs the engine's Android export
+templates and Gradle; that is not wired here.
+
+### iOS (macOS + Xcode)
+
+This Cloud Agent host is Linux, so iOS is proven on GitHub's `macos-latest`
+runner. On your Mac:
+
+```bash
+bash scripts/build_ios.sh
+bash scripts/verify_ios_binaries.sh
+```
+
+Requires the iPhoneOS SDK (`xcrun --sdk iphoneos --show-sdk-path`). The
+extension is a `.dylib` plus `libmujoco.dylib`; codesign / XCFramework
+packaging for an App Store export is still a follow-up.
 
 ## Keeping dependencies up to date
 
@@ -317,4 +370,5 @@ Focused on being a solid MuJoCo integration for Godot:
 
 - macOS `.dmg` extraction wired into the build (today: `-DGMJ_MUJOCO_ROOT`).
 - Optional `Node3D` base so the sim can compose with a scene-graph transform.
-- Mobile via a from-source MuJoCo cross-compile (see [Mobile](#mobile-ios--android)).
+- Android/iOS **device runtime** (Godot export + `adb`/`xcrun` smoke on an
+  emulator or phone). Compile proof is already in CI — see [Mobile](#mobile-ios--android).

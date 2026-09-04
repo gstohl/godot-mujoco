@@ -121,3 +121,38 @@ jobs:
           ls -la demo/addons/godot_mujoco/bin/
           test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.windows.template_debug.x86_64.dll
           test -f demo/addons/godot_mujoco/bin/mujoco.dll
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/godot-mujoco
+          key: android-ndk-r27c-linux
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential git curl unzip file binutils
+
+      - name: Build Android arm64 (from-source MuJoCo + GDExtension)
+        run: bash scripts/build_android.sh
+
+      - name: Verify Android binaries (AArch64, bionic, GDExtension entry)
+        run: bash scripts/verify_android_binaries.sh
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build iOS arm64 (from-source MuJoCo + GDExtension)
+        run: bash scripts/build_ios.sh
+
+      - name: Verify iOS binaries (arm64 iphoneos, not macOS)
+        run: bash scripts/verify_ios_binaries.sh

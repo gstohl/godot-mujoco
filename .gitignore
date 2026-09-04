@@ -1,6 +1,9 @@
 # CMake build trees
 /build/
 /build-release/
+/build-android/
+/build-ios/
+/build-from-source/
 
 # Godot import cache
 /demo/.godot/
@@ -10,4 +13,6 @@
 /demo/addons/godot_mujoco/bin/*.so.*
 /demo/addons/godot_mujoco/bin/*.dylib
 /demo/addons/godot_mujoco/bin/*.dll
+/demo/addons/godot_mujoco/bin/*.a
+/demo/addons/godot_mujoco/bin/gmj_core_smoke
 /demo/addons/godot_mujoco/bin/*.framework/
