@@ -20,14 +20,14 @@ ios.debug.arm64 = "res://addons/godot_mujoco/bin/libgodot_mujoco.ios.template_de
 ios.release.arm64 = "res://addons/godot_mujoco/bin/libgodot_mujoco.ios.template_release.arm64.dylib"
 
 [dependencies]
-linux.debug.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.12.0" : "" }
-linux.release.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.12.0" : "" }
-linux.debug.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.12.0" : "" }
-linux.release.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.so.3.12.0" : "" }
-macos.debug.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.3.12.0.dylib" : "" }
-macos.debug.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.3.12.0.dylib" : "" }
-macos.release.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.3.12.0.dylib" : "" }
-macos.release.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.3.12.0.dylib" : "" }
+linux.debug.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.@MUJOCO_VERSION@" : "" }
+linux.release.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.so.@MUJOCO_VERSION@" : "" }
+linux.debug.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.so.@MUJOCO_VERSION@" : "" }
+linux.release.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.so.@MUJOCO_VERSION@" : "" }
+macos.debug.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.@MUJOCO_VERSION@.dylib" : "" }
+macos.debug.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.@MUJOCO_VERSION@.dylib" : "" }
+macos.release.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.@MUJOCO_VERSION@.dylib" : "" }
+macos.release.x86_64 = { "res://addons/godot_mujoco/bin/libmujoco.dylib" : "", "res://addons/godot_mujoco/bin/libmujoco.@MUJOCO_VERSION@.dylib" : "" }
 windows.debug.x86_64 = { "res://addons/godot_mujoco/bin/mujoco.dll" : "" }
 windows.release.x86_64 = { "res://addons/godot_mujoco/bin/mujoco.dll" : "" }
 android.debug.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.so" : "", "res://addons/godot_mujoco/bin/libc++_shared.so" : "" }

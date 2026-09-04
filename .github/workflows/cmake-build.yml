@@ -13,56 +13,88 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve pinned versions
+        run: source scripts/pinned_versions.sh && echo "MUJOCO_VERSION=$MUJOCO_VERSION" >> "$GITHUB_ENV" && echo "GODOT_VERSION=$GODOT_VERSION" >> "$GITHUB_ENV"
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ runner.os }}
+          max-size: 1G
+
+      - name: Cache FetchContent sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps/godot-cpp-src
+            build/_deps/mujoco-src
+          key: deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('CMakeLists.txt') }}
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential git curl unzip
+          sudo apt-get install -y cmake build-essential git curl unzip clang-format
+
+      - name: Check C++ formatting
+        run: clang-format --dry-run -Werror src/*.cpp src/*.h
 
       - name: Build GDExtension (auto-fetches MuJoCo + godot-cpp)
         run: |
-          cmake -S . -B build
+          cmake -S . -B build \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build -j "$(nproc)"
 
       - name: Verify bundled runtime + linkage
         run: |
           ls -la demo/addons/godot_mujoco/bin/
           test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.x86_64.so
-          test -f demo/addons/godot_mujoco/bin/libmujoco.so.3.12.0
+          test -f "demo/addons/godot_mujoco/bin/libmujoco.so.${MUJOCO_VERSION}"
+          grep -q "libmujoco.so.${MUJOCO_VERSION}" demo/addons/godot_mujoco/godot_mujoco.gdextension
+          grep -q 'linux.debug.arm64' demo/addons/godot_mujoco/godot_mujoco.gdextension
+          grep -A1 '\[dependencies\]' demo/addons/godot_mujoco/godot_mujoco.gdextension | head -20
+          grep -q 'linux.debug.arm64 = { "res://addons/godot_mujoco/bin/libmujoco.so.' demo/addons/godot_mujoco/godot_mujoco.gdextension
+          grep -q 'reloadable = true' demo/addons/godot_mujoco/godot_mujoco.gdextension
           objdump -p demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.x86_64.so \
             | tee /tmp/objdump.txt
           grep -q 'RUNPATH .*\$ORIGIN' /tmp/objdump.txt
-          grep -q 'NEEDED .*libmujoco.so.3.12.0' /tmp/objdump.txt
+          grep -q "NEEDED .*libmujoco.so.${MUJOCO_VERSION}" /tmp/objdump.txt
 
       - name: Build release variant (export target)
         run: |
-          cmake -S . -B build-release -DGODOTCPP_TARGET=template_release
+          cmake -S . -B build-release -DGODOTCPP_TARGET=template_release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build-release -j "$(nproc)"
           test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_release.x86_64.so
 
-      - name: Download Godot 4.7.2
+      - name: Download Godot
         run: |
           curl -fsSL -o godot.zip \
-            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
           unzip -o godot.zip
+
+      - name: Import demo project
+        run: |
+          # Registration pass. Tolerate a non-zero exit: Godot's headless
+          # importer can fail on teardown after writing extension_list.cfg.
+          ./Godot_v${GODOT_VERSION}_linux.x86_64 --headless --path demo --import || true
 
       - name: Headless MuJoCo smoke test
         run: |
-          # Registers the GDExtension (may segfault on teardown, which is
-          # cosmetic — success is judged by the PASS marker below).
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo --import || true
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
+          ./Godot_v${GODOT_VERSION}_linux.x86_64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
             | tee smoke.log
           grep -q "SMOKE TEST: PASS" smoke.log
 
       - name: Chaos double-pendulum test
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://ChaosPendulumTest.tscn 2>&1 \
+          ./Godot_v${GODOT_VERSION}_linux.x86_64 --headless --path demo res://ChaosPendulumTest.tscn 2>&1 \
             | tee chaos.log
           grep -q "CHAOS TEST: PASS" chaos.log
 
       - name: Visual-debug data test (contacts / forces)
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path demo res://VisualDebugTest.tscn 2>&1 \
+          ./Godot_v${GODOT_VERSION}_linux.x86_64 --headless --path demo res://VisualDebugTest.tscn 2>&1 \
             | tee vdebug.log
           grep -q "VISUAL DEBUG DATA TEST: PASS" vdebug.log
 
@@ -72,6 +104,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve pinned versions
+        run: source scripts/pinned_versions.sh && echo "MUJOCO_VERSION=$MUJOCO_VERSION" >> "$GITHUB_ENV" && echo "GODOT_VERSION=$GODOT_VERSION" >> "$GITHUB_ENV"
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ runner.os }}
+          max-size: 1G
+
+      - name: Cache FetchContent sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps/godot-cpp-src
+            build/_deps/mujoco-src
+          key: deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('CMakeLists.txt') }}
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -79,26 +128,30 @@ jobs:
 
       - name: Build GDExtension (arm64, auto-fetches MuJoCo + godot-cpp)
         run: |
-          cmake -S . -B build
+          cmake -S . -B build \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build -j "$(nproc)"
 
       - name: Verify bundled runtime + linkage
         run: |
           ls -la demo/addons/godot_mujoco/bin/
           test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.arm64.so
-          test -f demo/addons/godot_mujoco/bin/libmujoco.so.3.12.0
+          test -f "demo/addons/godot_mujoco/bin/libmujoco.so.${MUJOCO_VERSION}"
+          grep -q "linux.debug.arm64 = { \"res://addons/godot_mujoco/bin/libmujoco.so.${MUJOCO_VERSION}\"" \
+            demo/addons/godot_mujoco/godot_mujoco.gdextension
           objdump -p demo/addons/godot_mujoco/bin/libgodot_mujoco.linux.template_debug.arm64.so \
             | tee /tmp/objdump.txt
           grep -q 'RUNPATH .*\$ORIGIN' /tmp/objdump.txt
-          grep -q 'NEEDED .*libmujoco.so.3.12.0' /tmp/objdump.txt
+          grep -q "NEEDED .*libmujoco.so.${MUJOCO_VERSION}" /tmp/objdump.txt
 
       - name: Headless MuJoCo smoke test (arm64)
         run: |
           curl -fsSL -o godot.zip \
-            https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.arm64.zip
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.arm64.zip"
           unzip -o godot.zip
-          ./Godot_v4.7.2-stable_linux.arm64 --headless --path demo --import || true
-          ./Godot_v4.7.2-stable_linux.arm64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
+          ./Godot_v${GODOT_VERSION}_linux.arm64 --headless --path demo --import || true
+          ./Godot_v${GODOT_VERSION}_linux.arm64 --headless --path demo res://HeadlessTest.tscn 2>&1 \
             | tee smoke.log
           grep -q "SMOKE TEST: PASS" smoke.log
 
@@ -111,9 +164,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build GDExtension (Windows / MSVC, auto-fetches MuJoCo + godot-cpp)
+      - name: Resolve pinned versions
+        run: source scripts/pinned_versions.sh && echo "MUJOCO_VERSION=$MUJOCO_VERSION" >> "$GITHUB_ENV" && echo "GODOT_VERSION=$GODOT_VERSION" >> "$GITHUB_ENV"
+
+      - name: Cache FetchContent sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/_deps/godot-cpp-src
+            build/_deps/mujoco-src
+          key: deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Build GDExtension (Windows / MSVC, debug)
         run: |
-          cmake -S . -B build
+          cmake -S . -B build -DGODOTCPP_TARGET=template_debug
           cmake --build build --config Release -j
 
       - name: Verify bundled runtime
@@ -122,11 +186,41 @@ jobs:
           test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.windows.template_debug.x86_64.dll
           test -f demo/addons/godot_mujoco/bin/mujoco.dll
 
+      - name: Build release variant (export target)
+        run: |
+          cmake -S . -B build-release -DGODOTCPP_TARGET=template_release
+          cmake --build build-release --config Release -j
+          test -f demo/addons/godot_mujoco/bin/libgodot_mujoco.windows.template_release.x86_64.dll
+
+      - name: Download Godot
+        run: |
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_win64.exe.zip"
+          unzip -o godot.zip
+          ls -la *.exe || true
+
+      - name: Headless MuJoCo smoke test (Windows)
+        run: |
+          GODOT_EXE=""
+          for c in "Godot_v${GODOT_VERSION}_win64_console.exe" "Godot_v${GODOT_VERSION}_win64.exe"; do
+            if [ -f "$c" ]; then GODOT_EXE="$c"; break; fi
+          done
+          test -n "$GODOT_EXE"
+          "./$GODOT_EXE" --headless --path demo --import || true
+          "./$GODOT_EXE" --headless --path demo res://HeadlessTest.tscn 2>&1 | tee smoke.log
+          grep -q "SMOKE TEST: PASS" smoke.log
+
   build-android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ runner.os }}
+          max-size: 1G
 
       - name: Cache Android NDK
         uses: actions/cache@v4
@@ -140,7 +234,10 @@ jobs:
           sudo apt-get install -y cmake build-essential git curl unzip file binutils
 
       - name: Build Android arm64 (from-source MuJoCo + GDExtension)
-        run: bash scripts/build_android.sh
+        run: |
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          bash scripts/build_android.sh
 
       - name: Verify Android binaries (AArch64, bionic, GDExtension entry)
         run: bash scripts/verify_android_binaries.sh
@@ -151,8 +248,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ github.job }}-${{ runner.os }}
+          max-size: 1G
+
       - name: Build iOS arm64 (from-source MuJoCo + GDExtension)
-        run: bash scripts/build_ios.sh
+        run: |
+          export CMAKE_C_COMPILER_LAUNCHER=ccache
+          export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          bash scripts/build_ios.sh
 
       - name: Verify iOS binaries (arm64 iphoneos, not macOS)
         run: bash scripts/verify_ios_binaries.sh

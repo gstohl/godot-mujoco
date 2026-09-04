@@ -1,0 +1,17 @@
+BasedOnStyle: LLVM
+AccessModifierOffset: -8
+AlignAfterOpenBracket: Align
+AllowShortFunctionsOnASingleLine: Inline
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+ColumnLimit: 120
+ContinuationIndentWidth: 8
+IndentCaseLabels: true
+IndentWidth: 8
+TabWidth: 8
+UseTab: ForIndentation
+PointerAlignment: Right
+SortIncludes: false
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+Standard: c++17

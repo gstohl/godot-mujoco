@@ -138,8 +138,9 @@ Or with **zero code**: add an `MjWorld` node, set its `model_path` and enable
 
 ### `MjWorld` API
 
-- Lifecycle: `load_model(path)`, `free_model()`, `is_ready()`, `reset()`,
-  `step(n=1)`, `forward()`
+- Lifecycle: `load_model(path)`, `load_model_from_string(xml)`, `free_model()`,
+  `is_ready()`, `reset()`, `step(n=1)`, `forward()`
+- Signals: `model_loaded`, `load_failed(error)`
 - Dimensions: `get_nq()`, `get_nv()`, `get_nu()`, `get_nbody()`, `get_njnt()`,
   `get_nsensor()`
 - Clock: `get_time()`, `get_timestep()`, `set_timestep(dt)`
@@ -151,14 +152,22 @@ Or with **zero code**: add an `MjWorld` node, set its `model_path` and enable
 - Kinematics: `body_world_position(i)` → `Vector3`,
   `body_world_quaternion(i)` → `Quaternion`, `body_world_transform(i)` →
   `Transform3D`
-- Diagnostics: `get_mujoco_version()`, `get_last_error()`
+- Diagnostics: `get_mujoco_version()`, `get_last_error()`,
+  `get_last_vfs_files()` (files copied into MuJoCo's VFS on the last load)
 - Debug: `get_ncon()` (active contacts), `get_kinetic_energy()`,
   `get_potential_energy()`, `get_warnings()`, `has_warnings()`,
   `get_debug_info()` (aggregate `Dictionary` snapshot)
 - Visual debug: `get_contacts()`, `get_center_of_mass()`, `get_joint_anchor(i)`,
   `get_joint_axis(i)`, plus the `MjDebugDraw` overlay node
-- Properties: `model_path`, `steps_per_tick`, `auto_step`
+- Properties: `model_path` (setting it while the node is in-tree reloads),
+  `steps_per_tick`, `auto_step` (`_physics_process` is enabled only when this
+  is true)
 
+> Getters never `push_error`. Call `is_ready()` first: dimension getters return
+> `-1` when not ready; value getters return `0` / empty when not ready or out of
+> range. Setters return `false`, set `last_error`, and `push_error` on failure.
+> `free_model()` clears `last_error`.
+>
 > MuJoCo is Z-up; Godot is Y-up. Kinematics queries return raw MuJoCo world-frame
 > values — remap axes in your scene as needed. `mj_step` evaluates sensors before
 > integrating, so call `forward()` if you need sensor/derived data consistent
@@ -224,12 +233,13 @@ types.)
 
 ```
 CMakeLists.txt                     # fetches MuJoCo + godot-cpp, builds + bundles
+cmake/godot_mujoco.gdextension.in  # manifest template (SONAME from MUJOCO_VERSION)
 src/                               # C++ GDExtension (MjWorld, registration)
 demo/                              # standard Godot project (GDScript)
   addons/godot_mujoco/*.gdextension
-  Main.tscn / HeadlessTest.tscn
-  models/pendulum.xml
-scripts/cloud_setup.sh             # idempotent CI / Cloud-Agent bring-up
+  Main.tscn / HeadlessTest.tscn / ChaosPendulum.tscn / VisualDebug.tscn
+  models/                          # pendulum, double pendulum, contacts, composite MJCF
+scripts/                           # cloud setup, mobile builds, version pins
 ```
 
 ## MuJoCo feature coverage
@@ -242,6 +252,7 @@ debug — but it does **not** wrap all of MuJoCo's very large C API. The native
 **Implemented**
 
 - Model/data lifecycle, `step`, `forward`, `reset`, multi-instance isolation
+- Signals (`model_loaded`, `load_failed`) and live `model_path` reload
 - Dimensions + name↔id lookup (bodies, joints, actuators, sensors)
 - Full state I/O: `qpos`, `qvel`, `ctrl` (scalar + batch)
 - Kinematics: body position, orientation, full `Transform3D`
@@ -270,9 +281,10 @@ Adding a wrapper is typically a few lines in `src/mj_world.cpp` plus a
 
 `load_model()` reads through Godot's filesystem (`FileAccess`) and hands the
 bytes to MuJoCo via its in-memory VFS, so `res://` models work in an **exported**
-game, not just the editor. It also scans the model's directory and adds sibling
-files to the VFS, so **multi-file MJCF** — `<include>` files and mesh/texture
-assets (e.g. `meshdir`) — resolves too. See
+game, not just the editor. It walks the MJCF for `<include file>`, compiler
+`meshdir` / `texturedir` / `assetdir`, and `file="..."` assets, and copies only
+those into the VFS (skipping `.godot`, `addons/`, and binaries). A model next to
+the rest of the project does **not** pull the whole tree into RAM. See
 [`demo/models/composite/`](demo/models/composite) for an `<include>` + mesh
 example.
 
@@ -287,9 +299,9 @@ example.
 - **Linux aarch64 / Windows x86_64** — official archives are checksum-pinned;
   CI builds both (arm64 also runs the headless smoke).
 - **macOS** — the official release is a `.dmg` CMake can't extract; download and
-  mount it, then build with `-DGMJ_MUJOCO_ROOT=/path/to/mujoco-3.12.0`. (The
-  `.gdextension` currently expects a `.framework`; adjust it to the produced
-  `.dylib` name if you package for macOS.)
+  mount it, then build with `-DGMJ_MUJOCO_ROOT=/path/to/mujoco-3.12.0`. The
+  `.gdextension` expects `libgodot_mujoco.macos.template_*.arm64|x86_64.dylib`
+  plus `libmujoco.dylib` / `libmujoco.<ver>.dylib`.
 - **Android arm64 / iOS arm64** — from-source cross-compile, proven in CI as
   binaries (see [Mobile](#mobile-ios--android)).
 
@@ -369,7 +381,8 @@ The three pinned versions (MuJoCo, Godot, godot-cpp) are the main thing to track
 
 Focused on being a solid MuJoCo integration for Godot:
 
-- macOS `.dmg` extraction wired into the build (today: `-DGMJ_MUJOCO_ROOT`).
+- macOS `.dmg` extraction wired into the build (today: `-DGMJ_MUJOCO_ROOT`;
+  the `.gdextension` already names `.dylib` outputs).
 - Optional `Node3D` base so the sim can compose with a scene-graph transform.
 - Android/iOS **device runtime** (Godot export + `adb`/`xcrun` smoke on an
   emulator or phone). Compile proof is already in CI — see [Mobile](#mobile-ios--android).
