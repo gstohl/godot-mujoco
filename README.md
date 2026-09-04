@@ -343,9 +343,10 @@ bash scripts/build_ios.sh
 bash scripts/verify_ios_binaries.sh
 ```
 
-Requires the iPhoneOS SDK (`xcrun --sdk iphoneos --show-sdk-path`). The
-extension is a `.dylib` plus `libmujoco.dylib`; codesign / XCFramework
-packaging for an App Store export is still a follow-up.
+Requires the iPhoneOS SDK (`xcrun --sdk iphoneos --show-sdk-path`) and
+**iOS 14+** (MuJoCo's thread pool uses `std::condition_variable` APIs that
+Apple gated at 14.0). The extension is a `.dylib` plus `libmujoco.dylib`;
+codesign / XCFramework packaging for an App Store export is still a follow-up.
 
 ## Keeping dependencies up to date
 
