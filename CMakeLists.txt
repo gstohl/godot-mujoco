@@ -158,6 +158,12 @@ else()
     message(STATUS "MuJoCo library: ${MUJOCO_LINK_LIB}")
 endif()
 
+# godot-cpp maps CMAKE_SYSTEM_PROCESSOR -> the `.arm64` suffix. iOS toolchains
+# often leave it empty, which produced `libgodot_mujoco.ios.template_debug..dylib`.
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND (NOT CMAKE_SYSTEM_PROCESSOR OR CMAKE_SYSTEM_PROCESSOR STREQUAL ""))
+    set(CMAKE_SYSTEM_PROCESSOR arm64)
+endif()
+
 # ---------------------------------------------------------------------------
 # Auto-fetch godot-cpp and build the C++ bindings
 # ---------------------------------------------------------------------------

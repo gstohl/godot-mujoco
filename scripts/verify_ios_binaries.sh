@@ -16,12 +16,17 @@ ls -la "$BIN"
 
 shopt -s nullglob
 # godot-cpp may emit .dylib or .a depending on version / library type.
-ext=( "$BIN"/libgodot_mujoco.ios.* )
+ext=( "$BIN"/libgodot_mujoco.ios.*.arm64.dylib "$BIN"/libgodot_mujoco.ios.*.arm64.a )
 if [[ ${#ext[@]} -eq 0 ]]; then
-  echo "FAIL: no libgodot_mujoco.ios.* in $BIN" >&2
+  echo "FAIL: no libgodot_mujoco.ios.*.arm64.dylib/.a in $BIN" >&2
+  ls -la "$BIN" >&2 || true
   exit 1
 fi
 EXT="${ext[0]}"
+if [[ "$EXT" == *..* ]]; then
+  echo "FAIL: iOS library name has an empty arch component: $EXT" >&2
+  exit 1
+fi
 
 mj=( "$BIN"/libmujoco*.dylib "$BIN"/libmujoco*.so )
 if [[ ${#mj[@]} -eq 0 ]]; then
