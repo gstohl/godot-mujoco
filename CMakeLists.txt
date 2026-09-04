@@ -33,6 +33,13 @@ option(GMJ_BUILD_CORE_SMOKE
     "Build the standalone MuJoCo core smoke executable (auto-on for mobile)"
     ${GMJ_MOBILE})
 
+# Keep the addon manifest's SONAME in lockstep with MUJOCO_VERSION.
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/godot_mujoco.gdextension.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/demo/addons/godot_mujoco/godot_mujoco.gdextension"
+    @ONLY
+    NEWLINE_STYLE UNIX)
+
 # ---------------------------------------------------------------------------
 # MuJoCo: from-source (mobile / opt-in) or official prebuilt (desktop)
 # ---------------------------------------------------------------------------

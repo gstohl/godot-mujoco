@@ -14,5 +14,20 @@ apply to the bundled binaries.
 - License: MIT
 - Statically linked into the GDExtension library.
 
+## From-source / mobile `libmujoco` dependencies
+
+Android and iOS (and `-DGMJ_BUILD_MUJOCO_FROM_SOURCE=ON`) compile MuJoCo's
+simulation core from source. The resulting `libmujoco` statically includes
+these upstream libraries — each keeps its own license:
+
+| Library | Upstream | License |
+| --- | --- | --- |
+| qhull | https://github.com/qhull/qhull | Qhull License (BSD-style) |
+| lodepng | https://github.com/lvandeve/lodepng | zlib |
+| tinyxml2 | https://github.com/leethomason/tinyxml2 | zlib |
+| libccd | https://github.com/danfis/libccd | BSD-3-Clause |
+| TinyObjLoader | https://github.com/tinyobjloader/tinyobjloader | MIT |
+| marchingcubecpp | (vendored by MuJoCo) | MIT |
+
 See each project's repository for full license texts. This addon itself is
 distributed under the MIT license (see the repository `LICENSE`).

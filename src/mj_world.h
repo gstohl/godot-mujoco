@@ -28,12 +28,21 @@ namespace godot {
 // not guard for concurrent access. Use one MjWorld from one thread at a time
 // (the same thread that drives its stepping); separate MjWorld instances on
 // separate threads are fine.
+//
+// Signals: `model_loaded` after a successful load; `load_failed(error)` after
+// any failed load (the previous model, if any, is left intact).
+//
+// Getters never push_error. Use `is_ready()` as the authoritative check:
+// dimension getters return -1 when not ready; value getters return 0 / empty
+// when not ready or out of range. Setters return false, set `last_error`, and
+// push_error on failure.
 class MjWorld : public Node {
 	GDCLASS(MjWorld, Node)
 
 	mjModel_ *model = nullptr;
 	mjData_ *data = nullptr;
 	String last_error;
+	int last_vfs_files = 0;
 
 	String model_path;
 	int steps_per_tick = 1;
@@ -46,6 +55,10 @@ class MjWorld : public Node {
 	// Compiles the model named `main_name` from a populated VFS, runs forward,
 	// and swaps it in on success. Takes ownership of `vfs` (always deleted).
 	bool commit_vfs_model(mjVFS_ *vfs, const String &main_name);
+
+	bool fail_load(const String &msg);
+
+	void sync_physics_process();
 
 protected:
 	static void _bind_methods();
@@ -63,7 +76,7 @@ public:
 	bool step(int n);
 	void forward();
 
-	// Model dimensions.
+	// Model dimensions. -1 when not ready.
 	int get_nq() const;
 	int get_nv() const;
 	int get_nu() const;
@@ -71,7 +84,7 @@ public:
 	int get_njnt() const;
 	int get_nsensor() const;
 
-	// Simulation clock.
+	// Simulation clock. 0 when not ready.
 	double get_time() const;
 	double get_timestep() const;
 	void set_timestep(double dt);
@@ -113,9 +126,10 @@ public:
 	// Diagnostics.
 	String get_mujoco_version() const;
 	String get_last_error() const;
+	int get_last_vfs_files() const;
 
 	// Debugging: live solver / physics introspection.
-	int get_ncon() const; // number of active contacts
+	int get_ncon() const; // number of active contacts; -1 when not ready
 	double get_kinetic_energy() const;
 	double get_potential_energy() const;
 	Dictionary get_warnings() const; // { warning_name: count } for non-zero warnings
@@ -123,12 +137,13 @@ public:
 	Dictionary get_debug_info() const; // aggregate snapshot for logging/inspection
 
 	// Visual-debug geometry (MuJoCo world frame; feed a MjDebugDraw overlay).
-	Array get_contacts() const; // [{ pos, normal, force, distance }]
+	Array get_contacts() const;         // [{ pos, normal, force, distance }]
 	Vector3 get_center_of_mass() const; // whole-model COM
 	Vector3 get_joint_anchor(int joint_index) const;
 	Vector3 get_joint_axis(int joint_index) const;
 
-	// Inspector-exposed properties.
+	// Inspector-exposed properties. Setting `model_path` while the node is
+	// in-tree (and not in the editor) reloads the model immediately.
 	void set_model_path(const String &p_path);
 	String get_model_path() const;
 	void set_steps_per_tick(int p_steps);

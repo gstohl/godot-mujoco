@@ -5,6 +5,15 @@ extends Node
 # Run with:
 #   godot --headless --path demo res://HeadlessTest.tscn
 
+var _sig_loaded := false
+var _sig_failed_err := ""
+
+func _on_model_loaded() -> void:
+	_sig_loaded = true
+
+func _on_load_failed(error: String) -> void:
+	_sig_failed_err = error
+
 func _ready() -> void:
 	var world := MjWorld.new()
 	add_child(world)
@@ -79,12 +88,39 @@ func _ready() -> void:
 	var t_before := world.get_time()
 	world.step(0)
 	var step0_noop: bool = world.get_time() == t_before
+
+	# Signals + live model_path reload while in-tree.
+	var wsig := MjWorld.new()
+	add_child(wsig)
+	wsig.model_loaded.connect(_on_model_loaded)
+	wsig.load_failed.connect(_on_load_failed)
+	wsig.load_model("res://models/pendulum.xml")
+	var sig_ok: bool = _sig_loaded and wsig.is_ready()
+	wsig.load_model("res://does_not_exist.xml")
+	sig_ok = sig_ok and not _sig_failed_err.is_empty() and wsig.is_ready() # previous model kept
+	wsig.model_path = "res://models/double_pendulum.xml"
+	var path_reload_ok: bool = wsig.is_ready() and wsig.get_nq() == 2
+
+	# Scoped VFS: a single-file model must not ingest the rest of models/.
+	var vfs_pendulum := world.get_last_vfs_files()
+	var vfs_composite := w3.get_last_vfs_files()
+	var vfs_single: bool = vfs_pendulum == 1
+	var vfs_multi: bool = vfs_composite >= 3 and vfs_composite < 20
+
+	# free_model() clears last_error and is_ready().
+	world.free_model()
+	var free_clears: bool = world.get_last_error().is_empty() and not world.is_ready() \
+		and world.get_nq() == -1
+
 	print("checks: strload=%s bad_set_rejected=%s name_roundtrip=%s step0_noop=%s" % [
 		str(strload_ok), str(bad_rejected), str(name_roundtrip), str(step0_noop)])
+	print("checks: sig=%s path_reload=%s vfs_single=%s vfs_multi=%s free_clears=%s vfs_files(p/c)=%d/%d" % [
+		str(sig_ok), str(path_reload_ok), str(vfs_single), str(vfs_multi), str(free_clears),
+		vfs_pendulum, vfs_composite])
 
-	var passed: bool = moved and body_id >= 0 and world.get_nq() == 1 and world.get_nu() == 1 \
-		and world.get_nsensor() == 2 and world.get_njnt() == 1 and sensor_matches_qpos \
-		and strload_ok and multifile_ok and bad_rejected and name_roundtrip and step0_noop
+	var passed: bool = moved and body_id >= 0 and sensor_matches_qpos \
+		and strload_ok and multifile_ok and bad_rejected and name_roundtrip and step0_noop \
+		and sig_ok and path_reload_ok and vfs_single and vfs_multi and free_clears
 	if passed:
 		print("SMOKE TEST: PASS")
 		get_tree().quit(0)

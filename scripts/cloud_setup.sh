@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Idempotent Cloud Agent setup for the godot-mujoco GDExtension.
 #
-# - Fetches a standard Godot 4.6 binary (no .NET/Mono needed).
+# - Fetches a standard Godot 4.7 binary (no .NET/Mono needed).
 # - Builds the GDExtension, which auto-fetches + bundles the MuJoCo runtime and
 #   godot-cpp (no manual MuJoCo install, no LD_LIBRARY_PATH).
 # - Registers the extension and validates it end-to-end with the headless
@@ -45,14 +45,17 @@ if [ -f "$REPO_ROOT/CMakeLists.txt" ] && [ -d "$REPO_ROOT/demo" ]; then
   timeout 180 "$GODOT_BIN" --headless --path "$REPO_ROOT/demo" --import || true
 
   # Validate end-to-end: the headless smoke test loads the model and steps
-  # MuJoCo entirely in-engine. Match the PASS marker rather than the exit code,
-  # since the headless renderer can segfault on teardown after a clean quit.
+  # MuJoCo entirely in-engine. Require both the PASS marker and a 0 exit code.
   echo "[cloud_setup] Running headless MuJoCo smoke test..."
-  if timeout 120 "$GODOT_BIN" --headless --path "$REPO_ROOT/demo" res://HeadlessTest.tscn 2>&1 \
-      | tee /tmp/gmj_smoke.log | grep -q "SMOKE TEST: PASS"; then
+  set +e
+  timeout 120 "$GODOT_BIN" --headless --path "$REPO_ROOT/demo" res://HeadlessTest.tscn 2>&1 \
+      | tee /tmp/gmj_smoke.log
+  smoke_rc=${PIPESTATUS[0]}
+  set -e
+  if grep -q "SMOKE TEST: PASS" /tmp/gmj_smoke.log && [ "$smoke_rc" -eq 0 ]; then
     echo "[cloud_setup] Smoke test PASSED."
   else
-    echo "[cloud_setup] Smoke test FAILED:"
+    echo "[cloud_setup] Smoke test FAILED (exit $smoke_rc):"
     cat /tmp/gmj_smoke.log
     exit 1
   fi
